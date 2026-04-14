@@ -7,7 +7,7 @@
     "build:main": "esbuild src/main/index.ts --bundle --platform=node --outfile=dist/main/index.js --external:electron --external:better-sqlite3 --external:keytar && esbuild src/main/preload.ts --bundle --platform=node --outfile=dist/main/preload.js --external:electron",
     "build:renderer": "vite build",
     "build": "pnpm build:main && pnpm build:renderer",
-    "dev": "pnpm build:main && concurrently \"vite\" \"wait-on http://localhost:5273 && electron .\"",
+    "dev": "rm -rf dist/renderer && pnpm build:main && concurrently \"vite\" \"wait-on http://localhost:5273 && VITE_DEV_SERVER_URL=http://localhost:5273 electron .\"",
     "electron": "electron .",
     "test": "vitest run",
     "test:e2e": "playwright test",
