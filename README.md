@@ -9,7 +9,7 @@ Plan 1 (current): `../docs/superpowers/plans/2026-04-13-decision-forge-plan-1-fo
 
 ## Status
 
-**Plans 2 & 3 complete (2026-04-14).** Forecast Journal and Monte Carlo Sandbox both ship. Open a question, log a probability, run a 10k-iteration simulation, log a forecast derived from any percentile, watch calibration accumulate over time. Negotiation Dojo (Plan 4) still a stub.
+**Plans 2, 3, 4 complete (2026-04-14).** Forecast Journal, Monte Carlo Sandbox, and Negotiation Dojo all ship. Log a calibrated prediction, run a 10k-iteration simulation, carry a percentile through to a forecast, rehearse a negotiation against an Anthropic-driven opposite number. Cross-module integration (MC → BATNA linkage, 3D visualisations) deferred to Plan 3.5 / 4.5.
 
 What exists in `packages/`:
 - **`core/`** — shared TS library. Zod schemas (`scenario`, `forecast`, `mc-config` — full; `nego-config` still placeholder), path helpers, vitest suite.

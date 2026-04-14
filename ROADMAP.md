@@ -42,13 +42,23 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - Correlations between variables (schema ready; sampler ignores)
 - Empirical + PERT sampling (schema ready; not wired)
 
-## Plan 4 — Negotiation Dojo
+## Plan 4 — Negotiation Dojo ✅ complete (2026-04-14)
 
-- [ ] `NegoConfigSchema` (replace placeholder)
-- [ ] Anthropic API integration via Claude Agent SDK / SDK
-- [ ] Real `keytar` wiring in `packages/desktop/src/main/keychain.ts`
-- [ ] Transcript storage + replay
-- [ ] Role/persona presets, rubric-based feedback
+- [x] `NegoConfigSchema` — seats, issues, personas, BATNA, transcript types
+- [x] Anthropic integration with tool-constrained agent (make_offer/accept/reject/walk)
+- [x] `keytar` keychain wiring (service: "DecisionForge")
+- [x] JSON-backed session store under `~/DecisionForge/nego/<id>.json`
+- [x] `/nego/start`, `/nego/action/{id}`, `/nego/state/{id}`, `/nego/debrief/{id}`
+- [x] Theater-script UI: KeyPrompt, Setup (Act I-III), SessionView, Debrief
+- [x] Per-seat utility, BATNA reference, Nash equal-gain target
+
+### Deferred to Plan 4.5
+- 3D negotiation table (react-three-fiber)
+- SSE streaming of agent turns (polling works for now)
+- Multi-issue offers with per-issue sliders
+- MC variable → BATNA linkage (`{refMCVar}`) fully wired
+- Thought-bubble reasoning trace
+- Timeline scrubber / replay
 
 ## Cross-cutting / Later
 
