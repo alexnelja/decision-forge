@@ -91,7 +91,17 @@ def submit_action(session_id: str, body: ActionRequest) -> dict:
         raise HTTPException(404, "session not found")
     except ValueError as exc:
         raise HTTPException(400, str(exc))
-    return session.to_dict()
+    except Exception as exc:
+        # Surface upstream errors (Anthropic API, network, etc.) with the real
+        # reason instead of a generic 500 body.
+        msg = str(exc)
+        # anthropic.BadRequestError stringifies as the full body; extract the
+        # human 'message' field if present.
+        import re
+        m = re.search(r"'message': '([^']+)'", msg)
+        if m:
+            msg = m.group(1)
+        raise HTTPException(502, f"upstream: {msg}")
 
 
 @router.get("/debrief/{session_id}")

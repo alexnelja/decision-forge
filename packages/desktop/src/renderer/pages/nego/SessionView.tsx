@@ -311,7 +311,20 @@ export function SessionView({
               </button>
             </div>
             {error && (
-              <p className="font-mono text-[11px]" style={{ color: "var(--sec-nego)" }}>{error}</p>
+              <div
+                className="border-l-2 bg-[color:var(--sec-nego)]/5 px-3 py-2"
+                style={{ borderColor: "var(--sec-nego)" }}
+              >
+                <div className="eyebrow" style={{ color: "var(--sec-nego)" }}>
+                  The line stalls
+                </div>
+                <p
+                  className="mt-1 font-display italic text-[13px] leading-snug text-ink"
+                  style={{ fontVariationSettings: '"opsz" 14, "wght" 380' }}
+                >
+                  {error.replace(/^Error invoking remote method '[^']+': Error:\s*/, "").replace(/^upstream:\s*/, "")}
+                </p>
+              </div>
             )}
           </div>
         ) : (

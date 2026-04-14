@@ -14,7 +14,15 @@ export class NegoClient {
     });
     if (!r.ok) {
       const body = await r.text();
-      throw new Error(`nego ${path} ${r.status}: ${body.slice(0, 200)}`);
+      // FastAPI formats {"detail": "..."}; try to pull the human message out.
+      let reason = body.slice(0, 400);
+      try {
+        const parsed = JSON.parse(body) as { detail?: string };
+        if (parsed.detail) reason = parsed.detail;
+      } catch {
+        // keep text
+      }
+      throw new Error(reason);
     }
     return r.json() as Promise<T>;
   }
