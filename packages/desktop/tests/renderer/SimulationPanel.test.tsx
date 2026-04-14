@@ -36,7 +36,8 @@ describe("SimulationPanel", () => {
     render(<SimulationPanel config={config} onRun={onRun} />);
     fireEvent.click(screen.getByRole("button", { name: /run/i }));
     await waitFor(() => expect(onRun).toHaveBeenCalledOnce());
-    expect(onRun.mock.calls[0][0].formula).toBe("x");
+    const call = onRun.mock.calls[0] as unknown as [{ formula: string }];
+    expect(call[0].formula).toBe("x");
   });
 
   it("renders the outcome histogram and stats after a run", async () => {

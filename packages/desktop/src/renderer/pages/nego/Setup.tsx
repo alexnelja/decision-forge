@@ -61,6 +61,27 @@ function defaultConfig(): NegoConfig {
   };
 }
 
+function rebalanceUtility(seats: NegoSeat[], issues: NegoIssue[]): NegoSeat[] {
+  // Keep each seat's utilityFn in sync with the current issues list —
+  // preserve weights where the issue name still exists, uniform-fill new ones,
+  // drop rows for removed issues, then normalise to sum 1.
+  const names = issues.map((i) => i.name);
+  return seats.map((seat) => {
+    const old = Object.fromEntries(seat.private.utilityFn.map((r) => [r.issue, r]));
+    const rows = names.map((name) => {
+      const existing = old[name];
+      if (existing) return existing;
+      return { issue: name, weight: 1 / Math.max(1, names.length), shape: "linear" as const };
+    });
+    const total = rows.reduce((a, r) => a + r.weight, 0) || 1;
+    const normalised = rows.map((r) => ({ ...r, weight: r.weight / total }));
+    return {
+      ...seat,
+      private: { ...seat.private, utilityFn: normalised }
+    };
+  });
+}
+
 function Slider({
   label,
   value,
@@ -96,14 +117,158 @@ function Slider({
   );
 }
 
+function IssueRow({
+  issue,
+  index,
+  onChange,
+  onRemove,
+  removable
+}: {
+  issue: NegoIssue;
+  index: number;
+  onChange: (patch: Partial<NegoIssue>) => void;
+  onRemove: () => void;
+  removable: boolean;
+}) {
+  return (
+    <div className="specimen relative grid grid-cols-[1fr_auto_auto_auto_auto] items-end gap-4 px-5 py-5">
+      <div className="absolute left-4 top-3 flex items-baseline gap-2 font-mono text-[9px] uppercase tracking-[0.3em] text-ink-dim">
+        <span>{String.fromCharCode(97 + index)}</span>
+        <span className="text-ink-faint">·</span>
+        <span>{issue.type}</span>
+      </div>
+      {removable && (
+        <button
+          type="button"
+          aria-label="Remove issue"
+          onClick={onRemove}
+          className="absolute right-3 top-2 h-6 w-6 font-display text-[18px] leading-none text-ink-faint hover:text-ink"
+        >
+          ×
+        </button>
+      )}
+      <div className="mt-4">
+        <label className="eyebrow mb-1 block">Name</label>
+        <input
+          value={issue.name}
+          onChange={(e) => onChange({ name: e.target.value })}
+          className="w-full border-0 bg-transparent font-display text-[22px] italic text-ink focus:outline-none"
+          style={{ fontVariationSettings: '"opsz" 28, "wght" 380' }}
+        />
+      </div>
+      <div className="mt-4">
+        <label className="eyebrow mb-1 block">Kind</label>
+        <select
+          value={issue.type}
+          onChange={(e) => {
+            const t = e.target.value as "continuous" | "discrete";
+            if (t === "continuous") {
+              onChange({ type: "continuous", range: issue.range ?? [0, 100], options: undefined });
+            } else {
+              onChange({ type: "discrete", options: issue.options ?? ["option_a", "option_b"], range: undefined });
+            }
+          }}
+          className="border-0 border-b border-ink-faint bg-transparent pb-1 font-mono text-[12px] text-ink focus:border-ink focus:outline-none"
+        >
+          <option value="continuous">continuous</option>
+          <option value="discrete">discrete</option>
+        </select>
+      </div>
+      {issue.type === "continuous" ? (
+        <>
+          <div className="mt-4">
+            <label className="eyebrow mb-1 block">Min</label>
+            <input
+              type="number"
+              value={issue.range?.[0] ?? 0}
+              onChange={(e) =>
+                onChange({ range: [parseFloat(e.target.value) || 0, issue.range?.[1] ?? 1] })
+              }
+              className="w-24 border-0 border-b border-ink-faint bg-transparent pb-1 font-mono text-[13px] tabular-nums text-ink focus:outline-none"
+            />
+          </div>
+          <div className="mt-4">
+            <label className="eyebrow mb-1 block">Max</label>
+            <input
+              type="number"
+              value={issue.range?.[1] ?? 1}
+              onChange={(e) =>
+                onChange({ range: [issue.range?.[0] ?? 0, parseFloat(e.target.value) || 1] })
+              }
+              className="w-24 border-0 border-b border-ink-faint bg-transparent pb-1 font-mono text-[13px] tabular-nums text-ink focus:outline-none"
+            />
+          </div>
+          <div className="mt-4">
+            <label className="eyebrow mb-1 block">Weight</label>
+            <input
+              type="number"
+              min={0}
+              max={1}
+              step={0.05}
+              value={issue.yourWeight}
+              onChange={(e) => onChange({ yourWeight: parseFloat(e.target.value) || 0 })}
+              className="w-20 border-0 border-b border-ink-faint bg-transparent pb-1 font-mono text-[13px] tabular-nums text-ink focus:outline-none"
+            />
+          </div>
+        </>
+      ) : (
+        <div className="col-span-3 mt-4">
+          <label className="eyebrow mb-1 block">Options (comma-separated)</label>
+          <input
+            value={(issue.options ?? []).join(", ")}
+            onChange={(e) =>
+              onChange({
+                options: e.target.value
+                  .split(",")
+                  .map((s) => s.trim())
+                  .filter(Boolean)
+              })
+            }
+            className="w-full border-0 border-b border-ink-faint bg-transparent pb-1 font-mono text-[13px] text-ink focus:outline-none"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
   const [config, setConfig] = useState<NegoConfig>(defaultConfig);
 
   function updateIssue(index: number, patch: Partial<NegoIssue>) {
-    setConfig((prev) => ({
-      ...prev,
-      issues: prev.issues.map((i, k) => (k === index ? ({ ...i, ...patch } as NegoIssue) : i))
-    }));
+    setConfig((prev) => {
+      const nextIssues = prev.issues.map((i, k) =>
+        k === index ? ({ ...i, ...patch } as NegoIssue) : i
+      );
+      const nextSeats = rebalanceUtility(prev.seats, nextIssues);
+      return { ...prev, issues: nextIssues, seats: nextSeats };
+    });
+  }
+
+  function addIssue() {
+    setConfig((prev) => {
+      const name = `issue_${prev.issues.length + 1}`;
+      const nextIssues: NegoIssue[] = [
+        ...prev.issues,
+        {
+          name,
+          type: "continuous",
+          range: [0, 100],
+          yourWeight: 1 / (prev.issues.length + 1)
+        }
+      ];
+      const nextSeats = rebalanceUtility(prev.seats, nextIssues);
+      return { ...prev, issues: nextIssues, seats: nextSeats };
+    });
+  }
+
+  function removeIssue(index: number) {
+    setConfig((prev) => {
+      if (prev.issues.length <= 1) return prev;
+      const nextIssues = prev.issues.filter((_, k) => k !== index);
+      const nextSeats = rebalanceUtility(prev.seats, nextIssues);
+      return { ...prev, issues: nextIssues, seats: nextSeats };
+    });
   }
 
   function updateSeat(index: number, patch: Partial<NegoSeat>) {
@@ -113,7 +278,6 @@ export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
     }));
   }
 
-  const issue = config.issues[0];
   const buyer = config.seats[0];
   const supplier = config.seats[1];
 
@@ -135,48 +299,30 @@ export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
           className="font-display italic text-[17px] leading-[1.5] text-ink-dim"
           style={{ fontVariationSettings: '"opsz" 18, "wght" 360' }}
         >
-          A single issue in contention. Draw the range. Declare the stakes.
+          Declare the issues in contention. One, or several. Continuous bounds or a
+          short list of choices.
         </p>
 
-        <div className="mt-6 grid grid-cols-[1fr_auto_auto] gap-6 border-b border-ink-faint pb-4">
-          <div>
-            <label htmlFor="iss-name" className="eyebrow mb-1 block">Issue</label>
-            <input
-              id="iss-name"
-              value={issue.name}
-              onChange={(e) => updateIssue(0, { name: e.target.value })}
-              className="w-full border-0 bg-transparent font-display text-[24px] italic text-ink focus:outline-none"
-              style={{ fontVariationSettings: '"opsz" 32, "wght" 380' }}
+        <div className="mt-6 space-y-4">
+          {config.issues.map((issue, i) => (
+            <IssueRow
+              key={i}
+              issue={issue}
+              index={i}
+              removable={config.issues.length > 1}
+              onChange={(patch) => updateIssue(i, patch)}
+              onRemove={() => removeIssue(i)}
             />
-          </div>
-          <div>
-            <label htmlFor="iss-lo" className="eyebrow mb-1 block">Min</label>
-            <input
-              id="iss-lo"
-              type="number"
-              value={issue.range?.[0] ?? 0}
-              onChange={(e) =>
-                updateIssue(0, {
-                  range: [parseFloat(e.target.value) || 0, issue.range?.[1] ?? 1]
-                })
-              }
-              className="w-24 border-0 bg-transparent pb-1 font-mono text-[15px] tabular-nums text-ink focus:outline-none"
-            />
-          </div>
-          <div>
-            <label htmlFor="iss-hi" className="eyebrow mb-1 block">Max</label>
-            <input
-              id="iss-hi"
-              type="number"
-              value={issue.range?.[1] ?? 1}
-              onChange={(e) =>
-                updateIssue(0, {
-                  range: [issue.range?.[0] ?? 0, parseFloat(e.target.value) || 1]
-                })
-              }
-              className="w-24 border-0 bg-transparent pb-1 font-mono text-[15px] tabular-nums text-ink focus:outline-none"
-            />
-          </div>
+          ))}
+          <button
+            type="button"
+            onClick={addIssue}
+            className="w-full border border-dashed border-ink-faint/60 bg-transparent px-4 py-3 text-left font-display italic text-[14px] text-ink-dim hover:border-ink hover:text-ink"
+            style={{ fontVariationSettings: '"opsz" 16, "wght" 360' }}
+          >
+            <span className="font-mono text-[11px] not-italic tracking-[0.2em] text-ink-faint">+</span>{" "}
+            Append an issue
+          </button>
         </div>
       </section>
 
@@ -257,7 +403,6 @@ export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
               style={{ fontVariationSettings: '"opsz" 56, "SOFT" 20, "wght" 360' }}
             />
 
-            {/* Persona picker */}
             <div className="mt-4 flex flex-wrap gap-x-5 gap-y-1">
               {STYLES.map((style) => {
                 const active = supplier.persona?.style === style;
@@ -270,7 +415,7 @@ export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
                         persona: { ...(supplier.persona as NegoPersona), style }
                       })
                     }
-                    className={`font-display text-[12px] italic transition-colors ${
+                    className={`font-display text-[12px] italic ${
                       active ? "text-ink" : "text-ink-faint hover:text-ink-dim"
                     }`}
                     style={{
@@ -412,7 +557,7 @@ export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
         <button
           type="button"
           onClick={() => onLaunch(config)}
-          className="border px-8 py-4 font-display text-[16px] tracking-[0.3em] transition-all"
+          className="border px-8 py-4 font-display text-[16px] tracking-[0.3em]"
           style={{
             borderColor: "var(--sec-nego)",
             background: "var(--sec-nego)",

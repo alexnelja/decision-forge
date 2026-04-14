@@ -45,8 +45,8 @@ describe("LogForecastButton", () => {
     fireEvent.click(screen.getByRole("button", { name: /commit/i }));
 
     await waitFor(() => expect(ask).toHaveBeenCalledOnce());
-    const [question] = ask.mock.calls[0];
-    expect(question.text).toContain("89");
+    const call = ask.mock.calls[0] as unknown as [{ text: string }, unknown];
+    expect(call[0].text).toContain("89");
     // Question text concerns exceeding a value — probability should be low (P90 → ~10%)
   });
 

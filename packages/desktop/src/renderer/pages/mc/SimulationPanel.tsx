@@ -7,20 +7,29 @@ function buildHistogram(
   samples: number[],
   width: number,
   height: number,
-  bins = 40
+  bins = 40,
+  fixedRange?: { lo: number; hi: number }
 ): { bars: HistBar[]; lo: number; hi: number } {
   if (samples.length === 0) return { bars: [], lo: 0, hi: 1 };
-  const sorted = [...samples].sort((a, b) => a - b);
-  const lo = sorted[0];
-  const hi = sorted[sorted.length - 1];
+  let lo: number;
+  let hi: number;
+  if (fixedRange) {
+    lo = fixedRange.lo;
+    hi = fixedRange.hi;
+  } else {
+    const sorted = [...samples].sort((a, b) => a - b);
+    lo = sorted[0];
+    hi = sorted[sorted.length - 1];
+  }
   if (hi === lo) return { bars: [], lo, hi };
   const binWidth = (hi - lo) / bins;
   const counts = new Array<number>(bins).fill(0);
   for (const v of samples) {
-    const idx = Math.min(bins - 1, Math.floor((v - lo) / binWidth));
+    const idx = Math.min(bins - 1, Math.max(0, Math.floor((v - lo) / binWidth)));
     counts[idx]++;
   }
   const maxCount = Math.max(...counts);
+  if (maxCount === 0) return { bars: [], lo, hi };
   const xStep = width / bins;
   const bars = counts.map((c, i) => ({
     x: i * xStep,
@@ -74,17 +83,34 @@ export function SimulationPanel({
   const [formula, setFormula] = useState(config.formula);
   const [iterations, setIterations] = useState(config.iterations);
   const [result, setResult] = useState<MCRunResult | null>(null);
+  const [baseline, setBaseline] = useState<MCRunResult | null>(null);
+  const [baselineLabel, setBaselineLabel] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [threshold, setThreshold] = useState<number>(0);
   const [runCount, setRunCount] = useState(0);
 
-  // keep formula in sync with parent config
   useEffect(() => setFormula(config.formula), [config.formula]);
 
+  // Build histograms over a SHARED x-range so two runs are visually comparable.
+  const sharedRange = useMemo(() => {
+    const all = [
+      ...(result?.samples ?? []),
+      ...(baseline?.samples ?? [])
+    ];
+    if (all.length === 0) return null;
+    const lo = Math.min(...all);
+    const hi = Math.max(...all);
+    return { lo, hi };
+  }, [result, baseline]);
+
   const hist = useMemo(
-    () => buildHistogram(result?.samples ?? [], 600, 180, 48),
-    [result]
+    () => buildHistogram(result?.samples ?? [], 600, 180, 48, sharedRange ?? undefined),
+    [result, sharedRange]
+  );
+  const baselineHist = useMemo(
+    () => buildHistogram(baseline?.samples ?? [], 600, 180, 48, sharedRange ?? undefined),
+    [baseline, sharedRange]
   );
 
   async function handleRun() {
@@ -206,6 +232,10 @@ export function SimulationPanel({
                   <stop offset="0%" stopColor="var(--sec-mc)" stopOpacity="0.55" />
                   <stop offset="100%" stopColor="var(--sec-mc)" stopOpacity="0.15" />
                 </linearGradient>
+                <linearGradient id="baselineGrad" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="0%" stopColor="var(--ink-dim)" stopOpacity="0.35" />
+                  <stop offset="100%" stopColor="var(--ink-dim)" stopOpacity="0.08" />
+                </linearGradient>
               </defs>
 
               {/* Horizontal gridlines */}
@@ -224,7 +254,23 @@ export function SimulationPanel({
               {/* Baseline */}
               <line x1={0} x2={600} y1={180} y2={180} stroke="var(--ink-faint)" strokeWidth="0.75" />
 
-              {/* Bars — staggered reveal */}
+              {/* Baseline distribution (if comparing) — drawn BEHIND current */}
+              {baseline &&
+                baselineHist.bars.map((b, i) => (
+                  <rect
+                    key={`base-${i}`}
+                    x={b.x}
+                    y={b.y}
+                    width={b.w}
+                    height={b.h}
+                    fill="url(#baselineGrad)"
+                    stroke="var(--ink-dim)"
+                    strokeOpacity={0.3}
+                    strokeWidth={0.4}
+                  />
+                ))}
+
+              {/* Current run bars — staggered reveal */}
               {bars.map((b, i) => (
                 <rect
                   key={`${runCount}-${i}`}
@@ -339,13 +385,81 @@ export function SimulationPanel({
             </div>
           </figure>
 
-          {/* Stats strip — magazine-sidebar */}
+          {/* Stats strip — magazine-sidebar, with baseline deltas when comparing */}
           <div className="grid grid-cols-5 gap-6 border-t border-paper-rule pt-6">
-            <BigStat label="Mean" value={fmt(result.stats.mean)} accent />
-            <BigStat label="SD" value={fmt(result.stats.sd)} />
-            <BigStat label="P5" value={fmt(result.stats.p5)} />
-            <BigStat label="P50" value={fmt(result.stats.p50)} accent />
-            <BigStat label="P95" value={fmt(result.stats.p95)} />
+            {(["mean", "sd", "p5", "p50", "p95"] as const).map((key) => {
+              const current = result.stats[key];
+              const base = baseline?.stats[key];
+              const delta = base !== undefined ? current - base : null;
+              return (
+                <div key={key}>
+                  <div className="eyebrow">{key.toUpperCase()}</div>
+                  <div
+                    className="mt-1 font-display text-[32px] leading-none text-ink tabular-nums"
+                    style={{
+                      fontVariationSettings: '"opsz" 72, "SOFT" 20, "wght" 300',
+                      letterSpacing: "-0.02em",
+                      fontFeatureSettings: '"tnum", "lnum"'
+                    }}
+                  >
+                    {fmt(current)}
+                  </div>
+                  {delta !== null && (
+                    <div
+                      className="mt-1 font-mono text-[11px] tabular-nums"
+                      style={{
+                        color:
+                          Math.abs(delta) < 1e-9
+                            ? "var(--ink-faint)"
+                            : delta > 0
+                            ? "var(--sec-mc)"
+                            : "var(--sec-nego)"
+                      }}
+                    >
+                      {delta > 0 ? "+" : ""}
+                      {fmt(delta)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Compare-mode controls */}
+          <div className="flex items-center justify-between gap-4 border-t border-paper-rule pt-4">
+            <div className="flex items-baseline gap-3">
+              <div className="eyebrow">Compare</div>
+              {baseline ? (
+                <span className="font-mono text-[11px] italic text-ink-dim">
+                  against "{baselineLabel}" ·{" "}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBaseline(null);
+                      setBaselineLabel("");
+                    }}
+                    className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                  >
+                    clear
+                  </button>
+                </span>
+              ) : (
+                <span className="meta italic">set a baseline, then rerun</span>
+              )}
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setBaseline(result);
+                setBaselineLabel(
+                  formula.length > 24 ? `${formula.slice(0, 24)}…` : formula
+                );
+              }}
+              disabled={busy}
+              className="border border-ink-faint bg-transparent px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] text-ink-dim hover:border-ink hover:text-ink disabled:opacity-40"
+            >
+              Keep as baseline
+            </button>
           </div>
 
           {/* Sensitivity — what drives the variance */}

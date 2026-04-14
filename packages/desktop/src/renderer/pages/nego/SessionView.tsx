@@ -1,5 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import type { NegoSessionState, NegoIssue } from "@decision-forge/core";
+import type {
+  NegoSessionState,
+  NegoIssue,
+  NegoAction,
+  NegoTranscriptEntry
+} from "@decision-forge/core";
 import { negoApi, type NegoDebrief } from "../../lib/nego-api";
 
 function displayValue(v: number | string): string {
@@ -13,16 +18,22 @@ function TranscriptLine({
   seatLabel,
   kind,
   speech,
-  terms
+  terms,
+  dim
 }: {
   seatLabel: string;
   kind: string;
   speech?: string;
   terms?: Record<string, number | string>;
+  dim?: boolean;
 }) {
   const accent = "var(--sec-nego)";
   return (
-    <div className="group border-l border-ink-faint pl-6 py-2 transition-colors hover:border-[color:var(--sec-nego)]">
+    <div
+      className={`border-l py-2 pl-6 ${
+        dim ? "border-ink-faint opacity-40" : "border-ink-faint hover:border-[color:var(--sec-nego)]"
+      }`}
+    >
       <div className="eyebrow" style={{ color: accent, letterSpacing: "0.3em" }}>
         {seatLabel} — {kind}
       </div>
@@ -54,6 +65,81 @@ function computePosition(issue: NegoIssue, value: number): string {
   return `${Math.max(0, Math.min(100, pct))}%`;
 }
 
+function initialTerms(issues: NegoIssue[]): Record<string, number | string> {
+  const out: Record<string, number | string> = {};
+  for (const issue of issues) {
+    if (issue.type === "continuous") {
+      const [lo, hi] = issue.range ?? [0, 1];
+      out[issue.name] = lo + (hi - lo) / 2;
+    } else {
+      out[issue.name] = issue.options?.[0] ?? "";
+    }
+  }
+  return out;
+}
+
+function IssueInput({
+  issue,
+  value,
+  onChange
+}: {
+  issue: NegoIssue;
+  value: number | string;
+  onChange: (v: number | string) => void;
+}) {
+  if (issue.type === "continuous") {
+    const [lo, hi] = issue.range ?? [0, 1];
+    const num = typeof value === "number" ? value : parseFloat(value) || lo;
+    return (
+      <div>
+        <div className="flex items-baseline justify-between">
+          <label className="eyebrow">{issue.name}</label>
+          <span className="font-mono text-[11px] tabular-nums text-ink-dim">
+            [{displayValue(lo)} – {displayValue(hi)}]
+          </span>
+        </div>
+        <input
+          type="number"
+          value={num}
+          min={lo}
+          max={hi}
+          step={(hi - lo) / 100 || 1}
+          onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+          className="w-full border-0 border-b border-ink-faint bg-transparent pb-1 font-display text-[22px] tabular-nums text-ink focus:border-ink focus:outline-none"
+          style={{ fontVariationSettings: '"opsz" 28, "wght" 320' }}
+        />
+        <input
+          type="range"
+          value={num}
+          min={lo}
+          max={hi}
+          step={(hi - lo) / 200 || 1}
+          onChange={(e) => onChange(parseFloat(e.target.value))}
+          className="mt-1 w-full"
+          style={{ accentColor: "var(--sec-nego)" }}
+        />
+      </div>
+    );
+  }
+  return (
+    <div>
+      <label className="eyebrow mb-1 block">{issue.name}</label>
+      <select
+        value={String(value)}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full border-0 border-b border-ink-faint bg-transparent pb-1 font-display italic text-[16px] text-ink focus:border-ink focus:outline-none"
+        style={{ fontVariationSettings: '"opsz" 18, "wght" 380' }}
+      >
+        {(issue.options ?? []).map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 export function SessionView({
   state,
   onUpdate,
@@ -67,11 +153,11 @@ export function SessionView({
   const yourTurn = currentSeat?.controlledBy === "you";
   const yourSeatId =
     state.config.seats.find((s) => s.controlledBy === "you")?.id ?? state.currentSeatId;
-  const issue = state.config.issues[0];
-  const [offerValue, setOfferValue] = useState<number>(() => {
-    const mid = (issue.range?.[0] ?? 0) + ((issue.range?.[1] ?? 1) - (issue.range?.[0] ?? 0)) / 2;
-    return mid;
-  });
+  const issues = state.config.issues;
+
+  const [terms, setTerms] = useState<Record<string, number | string>>(() =>
+    initialTerms(issues)
+  );
   const [speech, setSpeech] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,44 +178,45 @@ export function SessionView({
 
   async function submit(
     action:
-      | { kind: "offer"; value: number; speech: string }
+      | { kind: "offer"; speech: string }
       | { kind: "accept" | "reject" | "walk"; speech: string }
   ) {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      let payload: Parameters<typeof negoApi.action>[1];
+      let payload: NegoAction;
       if (action.kind === "offer") {
         payload = {
           kind: "offer",
           offer: {
             seatId: yourSeatId,
             roundIndex: state.roundIndex,
-            terms: { [issue.name]: action.value }
+            terms
           },
+          // @ts-expect-error: carry speech alongside; backend pulls it from action
           speech: action.speech || undefined
-        } as unknown as Parameters<typeof negoApi.action>[1];
+        };
       } else if (action.kind === "accept") {
         payload = {
           kind: "accept",
           seatId: yourSeatId,
-          offerRef: "",
-          speech: action.speech || "I'll take it."
-        } as unknown as Parameters<typeof negoApi.action>[1];
+          offerRef: ""
+        };
+        // @ts-expect-error
+        payload.speech = action.speech || "I'll take it.";
       } else if (action.kind === "reject") {
         payload = {
           kind: "reject",
           seatId: yourSeatId,
-          offerRef: "",
-          speech: action.speech || "Not yet."
-        } as unknown as Parameters<typeof negoApi.action>[1];
+          offerRef: ""
+        };
+        // @ts-expect-error
+        payload.speech = action.speech || "Not yet.";
       } else {
-        payload = {
-          kind: "walk",
-          seatId: yourSeatId,
-          speech: action.speech || "I'll walk."
-        } as unknown as Parameters<typeof negoApi.action>[1];
+        payload = { kind: "walk", seatId: yourSeatId };
+        // @ts-expect-error
+        payload.speech = action.speech || "I'll walk.";
       }
       const updated = await negoApi.action(state.id, payload);
       setSpeech("");
@@ -141,10 +228,11 @@ export function SessionView({
     }
   }
 
-  const [lo, hi] = issue.range ?? [0, 1];
+  // ZOPA bar shows the first continuous issue only (keeps the marginalia compact).
+  const primaryContinuous = issues.find((i) => i.type === "continuous");
 
   return (
-    <div className="grid grid-cols-[1fr_360px] gap-10">
+    <div className="grid grid-cols-[1fr_380px] gap-10">
       {/* Script column */}
       <div className="space-y-6">
         <div className="flex items-baseline gap-4 border-b border-ink-faint pb-2">
@@ -195,36 +283,50 @@ export function SessionView({
       </div>
 
       {/* Action / marginalia column */}
-      <aside className="space-y-6 pl-6 border-l border-ink-faint">
-        {/* ZOPA bar — visualises range and last offer */}
-        <div>
-          <div className="eyebrow mb-2">Range</div>
-          <div className="relative h-[46px] border-b border-ink-faint">
-            <div
-              className="absolute left-0 right-0 top-1/2 h-px"
-              style={{ background: "var(--sec-nego)", opacity: 0.4 }}
-            />
-            {lastOffer && typeof lastOffer.terms[issue.name] === "number" && (
+      <aside className="space-y-6 border-l border-ink-faint pl-6">
+        {/* ZOPA bar — primary continuous issue, with last offer */}
+        {primaryContinuous && (
+          <div>
+            <div className="mb-2 flex items-baseline justify-between">
+              <div className="eyebrow">{primaryContinuous.name}</div>
+              <span className="meta">range</span>
+            </div>
+            <div className="relative h-[46px] border-b border-ink-faint">
               <div
-                className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
-                style={{ left: computePosition(issue, lastOffer.terms[issue.name] as number) }}
-              >
-                <span className="block h-3 w-3 rounded-full" style={{ background: "var(--sec-nego)" }} />
-                <span className="mt-1 block font-mono text-[10px] text-ink-dim tabular-nums">
-                  {displayValue(lastOffer.terms[issue.name])}
-                </span>
-              </div>
-            )}
+                className="absolute left-0 right-0 top-1/2 h-px"
+                style={{ background: "var(--sec-nego)", opacity: 0.4 }}
+              />
+              {lastOffer &&
+                typeof lastOffer.terms[primaryContinuous.name] === "number" && (
+                  <div
+                    className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2"
+                    style={{
+                      left: computePosition(
+                        primaryContinuous,
+                        lastOffer.terms[primaryContinuous.name] as number
+                      )
+                    }}
+                  >
+                    <span
+                      className="block h-3 w-3 rounded-full"
+                      style={{ background: "var(--sec-nego)" }}
+                    />
+                    <span className="mt-1 block font-mono text-[10px] tabular-nums text-ink-dim">
+                      {displayValue(lastOffer.terms[primaryContinuous.name])}
+                    </span>
+                  </div>
+                )}
+            </div>
+            <div className="mt-1 flex justify-between font-mono text-[10px] tabular-nums text-ink-faint">
+              <span>{displayValue(primaryContinuous.range?.[0] ?? 0)}</span>
+              <span>{displayValue(primaryContinuous.range?.[1] ?? 1)}</span>
+            </div>
           </div>
-          <div className="mt-1 flex justify-between font-mono text-[10px] text-ink-faint tabular-nums">
-            <span>{displayValue(lo)}</span>
-            <span>{displayValue(hi)}</span>
-          </div>
-        </div>
+        )}
 
         {/* Your action */}
         {yourTurn ? (
-          <div className="slip space-y-4 px-5 py-6">
+          <div className="slip space-y-5 px-5 py-6">
             <div>
               <div className="eyebrow mb-1">Your move</div>
               <h3
@@ -235,32 +337,14 @@ export function SessionView({
               </h3>
             </div>
 
-            <div>
-              <label htmlFor="offer-val" className="eyebrow mb-1 block">
-                {issue.name}
-              </label>
-              <input
-                id="offer-val"
-                type="number"
-                value={offerValue}
-                min={lo}
-                max={hi}
-                step={(hi - lo) / 100 || 1}
-                onChange={(e) => setOfferValue(parseFloat(e.target.value) || 0)}
-                className="w-full border-0 border-b border-ink-faint bg-transparent pb-1 font-display text-[32px] tabular-nums text-ink focus:border-ink focus:outline-none"
-                style={{ fontVariationSettings: '"opsz" 40, "wght" 320' }}
+            {issues.map((issue) => (
+              <IssueInput
+                key={issue.name}
+                issue={issue}
+                value={terms[issue.name] ?? ""}
+                onChange={(v) => setTerms((prev) => ({ ...prev, [issue.name]: v }))}
               />
-              <input
-                type="range"
-                value={offerValue}
-                min={lo}
-                max={hi}
-                step={(hi - lo) / 200 || 1}
-                onChange={(e) => setOfferValue(parseFloat(e.target.value))}
-                className="mt-2 w-full"
-                style={{ accentColor: "var(--sec-nego)" }}
-              />
-            </div>
+            ))}
 
             <div>
               <label htmlFor="speech" className="eyebrow mb-1 block">What you say</label>
@@ -278,7 +362,7 @@ export function SessionView({
             <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
-                onClick={() => submit({ kind: "offer", value: offerValue, speech })}
+                onClick={() => submit({ kind: "offer", speech })}
                 disabled={busy}
                 className="border px-4 py-2 font-mono text-[11px] uppercase tracking-[0.22em] text-paper"
                 style={{ borderColor: "var(--sec-nego)", background: "var(--sec-nego)" }}
@@ -369,7 +453,7 @@ function toRoman(n: number): string {
 }
 
 /* ———————————————————————————————
- * Debrief — final curtain
+ * Debrief — final curtain + scrubber replay
  * ——————————————————————————————— */
 
 export function Debrief({
@@ -389,6 +473,30 @@ export function Debrief({
   };
 
   const seats = state.config.seats;
+  const transcript = debrief.transcript as NegoTranscriptEntry[];
+  const [cursor, setCursor] = useState<number>(transcript.length);
+  const primaryContinuous = state.config.issues.find((i) => i.type === "continuous");
+
+  // At cursor=k, show the first k entries; "playback" plays from 0 to end.
+  const visible = transcript.slice(0, cursor);
+  const cursorOffer = useMemo(() => {
+    for (let i = visible.length - 1; i >= 0; i--) {
+      const a = visible[i].action;
+      if (a.kind === "offer") return a.offer;
+    }
+    return null;
+  }, [visible]);
+
+  const [playing, setPlaying] = useState(false);
+  useEffect(() => {
+    if (!playing) return;
+    if (cursor >= transcript.length) {
+      setPlaying(false);
+      return;
+    }
+    const t = setTimeout(() => setCursor((c) => c + 1), 900);
+    return () => clearTimeout(t);
+  }, [playing, cursor, transcript.length]);
 
   return (
     <div className="space-y-10">
@@ -406,9 +514,10 @@ export function Debrief({
             style={{ fontVariationSettings: '"opsz" 24, "wght" 360' }}
           >
             Terms:{" "}
-            {Object.entries(debrief.dealTerms).map(([k, v]) => (
+            {Object.entries(debrief.dealTerms).map(([k, v], i, arr) => (
               <span key={k} className="text-ink">
                 {k} = {displayValue(v)}
+                {i < arr.length - 1 ? ", " : ""}
               </span>
             ))}
           </p>
@@ -421,12 +530,9 @@ export function Debrief({
           return (
             <div key={seat.id}>
               <div className="eyebrow mb-2">{seat.label}</div>
-              <div
-                className="numeral text-[72px]"
-                style={{ color: "var(--sec-nego)" }}
-              >
+              <div className="numeral text-[72px]" style={{ color: "var(--sec-nego)" }}>
                 {u ? (u.utility * 100).toFixed(0) : "—"}
-                <span className="ml-1 font-mono text-[16px] text-ink-dim align-top">u</span>
+                <span className="ml-1 align-top font-mono text-[16px] text-ink-dim">u</span>
               </div>
               <div className="meta mt-1">
                 BATNA reference: {u ? displayValue(u.batna) : "—"}
@@ -443,9 +549,128 @@ export function Debrief({
             className="font-display italic text-[18px] text-ink-dim"
             style={{ fontVariationSettings: '"opsz" 20, "wght" 360' }}
           >
-            Equal-gain target utility ≈ {(debrief.nashRef.equalGainTarget * 100).toFixed(0)}. Compare to
-            where you actually landed.
+            Equal-gain target utility ≈ {(debrief.nashRef.equalGainTarget * 100).toFixed(0)}. Compare
+            to where you actually landed.
           </p>
+        </div>
+      )}
+
+      {/* Scrubber */}
+      {transcript.length > 0 && (
+        <div className="border-t border-paper-rule pt-6">
+          <div className="mb-3 flex items-baseline justify-between">
+            <div className="eyebrow">Replay</div>
+            <span className="meta tabular-nums">
+              {cursor} / {transcript.length}
+            </span>
+          </div>
+
+          {/* ZOPA with current cursor offer */}
+          {primaryContinuous && (
+            <div className="relative mb-4 h-[48px] border-b border-ink-faint">
+              <div
+                className="absolute left-0 right-0 top-1/2 h-px"
+                style={{ background: "var(--sec-nego)", opacity: 0.4 }}
+              />
+              {cursorOffer && typeof cursorOffer.terms[primaryContinuous.name] === "number" && (
+                <div
+                  className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 transition-all"
+                  style={{
+                    left: computePosition(
+                      primaryContinuous,
+                      cursorOffer.terms[primaryContinuous.name] as number
+                    )
+                  }}
+                >
+                  <span
+                    className="block h-3 w-3 rounded-full"
+                    style={{ background: "var(--sec-nego)" }}
+                  />
+                  <span className="mt-1 block font-mono text-[10px] tabular-nums text-ink-dim">
+                    {displayValue(cursorOffer.terms[primaryContinuous.name])}
+                  </span>
+                </div>
+              )}
+              <div className="absolute -bottom-5 left-0 font-mono text-[10px] tabular-nums text-ink-faint">
+                {displayValue(primaryContinuous.range?.[0] ?? 0)}
+              </div>
+              <div className="absolute -bottom-5 right-0 font-mono text-[10px] tabular-nums text-ink-faint">
+                {displayValue(primaryContinuous.range?.[1] ?? 1)}
+              </div>
+            </div>
+          )}
+
+          <input
+            type="range"
+            min={0}
+            max={transcript.length}
+            step={1}
+            value={cursor}
+            onChange={(e) => {
+              setPlaying(false);
+              setCursor(parseInt(e.target.value, 10));
+            }}
+            className="w-full"
+            style={{ accentColor: "var(--sec-nego)" }}
+            aria-label="Replay scrubber"
+          />
+
+          <div className="mt-3 flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => {
+                if (cursor >= transcript.length) setCursor(0);
+                setPlaying((p) => !p);
+              }}
+              className="border border-ink bg-transparent px-4 py-1.5 font-mono text-[11px] uppercase tracking-[0.22em] text-ink hover:bg-ink hover:text-paper"
+            >
+              {playing ? "Pause" : "Play"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPlaying(false);
+                setCursor(0);
+              }}
+              className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-dim hover:text-ink"
+            >
+              Rewind
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPlaying(false);
+                setCursor(transcript.length);
+              }}
+              className="font-mono text-[11px] uppercase tracking-[0.22em] text-ink-dim hover:text-ink"
+            >
+              End
+            </button>
+          </div>
+
+          <div className="mt-6 space-y-2">
+            {transcript.map((entry, i) => {
+              const a = entry.action;
+              const sid =
+                a.kind === "offer"
+                  ? a.offer.seatId
+                  : "seatId" in a
+                  ? (a as { seatId: string }).seatId
+                  : "?";
+              const seat = getSeat(state, sid);
+              const label = seat?.label ?? sid;
+              return (
+                <TranscriptLine
+                  key={i}
+                  seatLabel={label}
+                  kind={a.kind}
+                  speech={entry.speech}
+                  terms={a.kind === "offer" ? a.offer.terms : undefined}
+                  dim={i >= cursor}
+                />
+              );
+            })}
+          </div>
         </div>
       )}
 

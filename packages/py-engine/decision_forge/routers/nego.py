@@ -1,13 +1,14 @@
 """Negotiation REST endpoints."""
 from __future__ import annotations
 
+import json
 import os
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from decision_forge.nego.agent import AnthropicDriver
+from decision_forge.nego.agent import AnthropicDriver, ScriptedDriver
 from decision_forge.nego.session import SessionStore, make_store
 
 
@@ -24,6 +25,20 @@ def _default_store() -> SessionStore:
     global _store
     if _store is None:
         base = os.environ.get("DECISION_FORGE_NEGO_DIR", os.path.expanduser("~/DecisionForge/nego"))
+
+        # Test/e2e hook — DECISION_FORGE_NEGO_SCRIPT is a JSON array of actions.
+        # Takes precedence over the Anthropic key so e2e runs are deterministic.
+        script_env = os.environ.get("DECISION_FORGE_NEGO_SCRIPT")
+        if script_env:
+            try:
+                script = json.loads(script_env)
+                driver = ScriptedDriver(script=list(script))
+                _store = SessionStore(base, driver=driver)
+                return _store
+            except Exception:
+                # Fall through to normal path if script is malformed
+                pass
+
         key = os.environ.get("ANTHROPIC_API_KEY")
         _store = make_store(base, anthropic_key=key)
     return _store
@@ -102,6 +117,7 @@ def submit_action(session_id: str, body: ActionRequest) -> dict:
         if m:
             msg = m.group(1)
         raise HTTPException(502, f"upstream: {msg}")
+    return session.to_dict()
 
 
 @router.get("/debrief/{session_id}")

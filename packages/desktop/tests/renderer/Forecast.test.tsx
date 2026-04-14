@@ -87,7 +87,8 @@ describe("Forecast page", () => {
     fireEvent.click(buttons[0]!);
 
     await waitFor(() => expect(forecast.ask).toHaveBeenCalledTimes(1));
-    const [body] = forecast.ask.mock.calls[0];
+    const askMock = forecast.ask as unknown as { mock: { calls: Array<[{ question: { text: string }; prediction: { probability: number } }]> } };
+    const [body] = askMock.mock.calls[0]!;
     expect(body.question.text).toBe("Will it snow?");
     expect(body.prediction.probability).toBeCloseTo(0.5, 5);
   });

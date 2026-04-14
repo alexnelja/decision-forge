@@ -19,10 +19,10 @@ describe("McClient", () => {
     expect(result.iterations).toBe(1000);
     expect(result.stats.mean).toBe(2);
     expect(fetchImpl).toHaveBeenCalledOnce();
-    const call = fetchImpl.mock.calls[0];
+    const call = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
     expect(call[0]).toBe("http://engine/mc/run");
-    expect((call[1] as RequestInit).method).toBe("POST");
-    expect(JSON.parse((call[1] as RequestInit).body as string)).toEqual(cfg);
+    expect(call[1].method).toBe("POST");
+    expect(JSON.parse(call[1].body as string)).toEqual(cfg);
   });
 
   it("throws on non-OK responses with a short reason", async () => {
