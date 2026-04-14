@@ -46,6 +46,7 @@ describe("SimulationPanel", () => {
     await waitFor(() => {
       expect(container.querySelector("svg.outcome-histogram")).toBeTruthy();
     });
-    expect(screen.getByText(/P50/i)).toBeTruthy();
+    // P50 appears both as an SVG marker and in the stats strip
+    expect(screen.getAllByText(/P50/i).length).toBeGreaterThan(0);
   });
 });

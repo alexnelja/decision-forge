@@ -1,12 +1,12 @@
 import { useId, useMemo } from "react";
 import type { Distribution, MCVariable } from "@decision-forge/core";
-import { histogramPath, sampleDistribution } from "../../lib/mc-client-samplers";
+import { sampleDistribution } from "../../lib/mc-client-samplers";
 
-const KINDS: Array<{ key: Distribution["kind"]; label: string }> = [
-  { key: "normal", label: "N" },
-  { key: "lognormal", label: "LN" },
-  { key: "triangular", label: "T" },
-  { key: "uniform", label: "U" }
+const KINDS: Array<{ key: Distribution["kind"]; label: string; long: string }> = [
+  { key: "normal", label: "N", long: "Normal" },
+  { key: "lognormal", label: "LN", long: "Log-normal" },
+  { key: "triangular", label: "T", long: "Triangular" },
+  { key: "uniform", label: "U", long: "Uniform" }
 ];
 
 function defaultDistribution(kind: Distribution["kind"]): Distribution {
@@ -24,7 +24,44 @@ function defaultDistribution(kind: Distribution["kind"]): Distribution {
   }
 }
 
-function ParamInputs({
+function kindLong(kind: Distribution["kind"]): string {
+  return KINDS.find((k) => k.key === kind)?.long ?? kind;
+}
+
+/* ————————————————————————————————————————————
+ * Ledger input — underlined baseline, no box
+ * ———————————————————————————————————————————— */
+function LedgerInput({
+  id,
+  label,
+  value,
+  min,
+  onChange
+}: {
+  id: string;
+  label: string;
+  value: number;
+  min?: number;
+  onChange: (n: number) => void;
+}) {
+  return (
+    <label htmlFor={id} className="block">
+      <span className="eyebrow mb-1 block">{label}</span>
+      <input
+        id={id}
+        type="number"
+        step="any"
+        min={min}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
+        className="w-full bg-transparent border-0 border-b border-ink-faint px-0 pb-1 font-mono text-[13px] text-ink focus:border-ink focus:outline-none tabular-nums"
+        style={{ fontFeatureSettings: '"tnum", "zero"' }}
+      />
+    </label>
+  );
+}
+
+function ParamFields({
   distribution,
   onChange,
   idPrefix
@@ -33,115 +70,81 @@ function ParamInputs({
   onChange: (d: Distribution) => void;
   idPrefix: string;
 }) {
-  const fieldClass =
-    "w-full rounded-none border border-ink-dim/20 bg-transparent px-2 py-1 font-mono text-[11px] text-ink focus:border-ink focus:outline-none";
-  const labelClass = "eyebrow mb-1 block";
-
   switch (distribution.kind) {
     case "normal":
       return (
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label htmlFor={`${idPrefix}-mean`} className={labelClass}>Mean</label>
-            <input
-              id={`${idPrefix}-mean`}
-              type="number"
-              step="any"
-              className={fieldClass}
-              value={distribution.mean}
-              onChange={(e) =>
-                onChange({ ...distribution, mean: parseFloat(e.target.value) || 0 })
-              }
-            />
-          </div>
-          <div>
-            <label htmlFor={`${idPrefix}-sd`} className={labelClass}>SD</label>
-            <input
-              id={`${idPrefix}-sd`}
-              type="number"
-              step="any"
-              min={0.0001}
-              className={fieldClass}
-              value={distribution.sd}
-              onChange={(e) =>
-                onChange({ ...distribution, sd: parseFloat(e.target.value) || 0.0001 })
-              }
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <LedgerInput
+            id={`${idPrefix}-mean`}
+            label="μ  Mean"
+            value={distribution.mean}
+            onChange={(n) => onChange({ ...distribution, mean: n })}
+          />
+          <LedgerInput
+            id={`${idPrefix}-sd`}
+            label="σ  SD"
+            value={distribution.sd}
+            min={0.0001}
+            onChange={(n) => onChange({ ...distribution, sd: n || 0.0001 })}
+          />
         </div>
       );
     case "lognormal":
       return (
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className={labelClass}>Mean (log)</label>
-            <input
-              type="number"
-              step="any"
-              className={fieldClass}
-              value={distribution.meanlog}
-              onChange={(e) =>
-                onChange({ ...distribution, meanlog: parseFloat(e.target.value) || 0 })
-              }
-            />
-          </div>
-          <div>
-            <label className={labelClass}>SD (log)</label>
-            <input
-              type="number"
-              step="any"
-              min={0.0001}
-              className={fieldClass}
-              value={distribution.sdlog}
-              onChange={(e) =>
-                onChange({ ...distribution, sdlog: parseFloat(e.target.value) || 0.0001 })
-              }
-            />
-          </div>
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <LedgerInput
+            id={`${idPrefix}-meanlog`}
+            label="μ  Mean (log)"
+            value={distribution.meanlog}
+            onChange={(n) => onChange({ ...distribution, meanlog: n })}
+          />
+          <LedgerInput
+            id={`${idPrefix}-sdlog`}
+            label="σ  SD (log)"
+            value={distribution.sdlog}
+            min={0.0001}
+            onChange={(n) => onChange({ ...distribution, sdlog: n || 0.0001 })}
+          />
         </div>
       );
     case "triangular":
       return (
-        <div className="grid grid-cols-3 gap-2">
-          {(["min", "mode", "max"] as const).map((field) => (
-            <div key={field}>
-              <label className={labelClass}>{field[0].toUpperCase() + field.slice(1)}</label>
-              <input
-                type="number"
-                step="any"
-                className={fieldClass}
-                value={distribution[field]}
-                onChange={(e) =>
-                  onChange({
-                    ...distribution,
-                    [field]: parseFloat(e.target.value) || 0
-                  } as Distribution)
-                }
-              />
-            </div>
-          ))}
+        <div className="grid grid-cols-3 gap-x-6 gap-y-3">
+          <LedgerInput
+            id={`${idPrefix}-min`}
+            label="a  Min"
+            value={distribution.min}
+            onChange={(n) => onChange({ ...distribution, min: n })}
+          />
+          <LedgerInput
+            id={`${idPrefix}-mode`}
+            label="c  Mode"
+            value={distribution.mode}
+            onChange={(n) => onChange({ ...distribution, mode: n })}
+          />
+          <LedgerInput
+            id={`${idPrefix}-max`}
+            label="b  Max"
+            value={distribution.max}
+            onChange={(n) => onChange({ ...distribution, max: n })}
+          />
         </div>
       );
     case "uniform":
       return (
-        <div className="grid grid-cols-2 gap-2">
-          {(["min", "max"] as const).map((field) => (
-            <div key={field}>
-              <label className={labelClass}>{field[0].toUpperCase() + field.slice(1)}</label>
-              <input
-                type="number"
-                step="any"
-                className={fieldClass}
-                value={distribution[field]}
-                onChange={(e) =>
-                  onChange({
-                    ...distribution,
-                    [field]: parseFloat(e.target.value) || 0
-                  } as Distribution)
-                }
-              />
-            </div>
-          ))}
+        <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+          <LedgerInput
+            id={`${idPrefix}-min`}
+            label="a  Min"
+            value={distribution.min}
+            onChange={(n) => onChange({ ...distribution, min: n })}
+          />
+          <LedgerInput
+            id={`${idPrefix}-max`}
+            label="b  Max"
+            value={distribution.max}
+            onChange={(n) => onChange({ ...distribution, max: n })}
+          />
         </div>
       );
     default:
@@ -149,68 +152,184 @@ function ParamInputs({
   }
 }
 
+/* ————————————————————————————————————————————
+ * Annotated probability curve — path + area + tick marks
+ * Draws over a 200x66 viewbox for sharper detail than the old 100x50.
+ * ———————————————————————————————————————————— */
+function ProbabilityCurve({
+  distribution,
+  accent
+}: {
+  distribution: Distribution;
+  accent: string;
+}) {
+  const { pathFill, pathStroke, mode, lo, hi } = useMemo(() => {
+    const raw = sampleDistribution(distribution, 2000);
+    if (raw.length === 0) return { pathFill: "", pathStroke: "", mode: 100, lo: 0, hi: 1 };
+    const sorted = [...raw].sort((a, b) => a - b);
+    const lo = sorted[0];
+    const hi = sorted[sorted.length - 1];
+    if (hi === lo) {
+      return { pathFill: "", pathStroke: "", mode: 100, lo, hi };
+    }
+    // Kernel-ish smoothing: accumulate into 40 bins then smooth
+    const bins = 60;
+    const width = (hi - lo) / bins;
+    const counts = new Array<number>(bins).fill(0);
+    for (const v of raw) {
+      const idx = Math.min(bins - 1, Math.floor((v - lo) / width));
+      counts[idx]++;
+    }
+    // 3-wide moving average
+    const smooth = counts.map((_, i) => {
+      const a = counts[Math.max(0, i - 1)];
+      const b = counts[i];
+      const c = counts[Math.min(bins - 1, i + 1)];
+      return (a + b + c) / 3;
+    });
+    const maxC = Math.max(...smooth) || 1;
+    const W = 200;
+    const H = 54; // leave room for baseline labels
+    const BASE = 60;
+    let fill = `M 0 ${BASE}`;
+    let stroke = "";
+    smooth.forEach((c, i) => {
+      const x = (i / (bins - 1)) * W;
+      const y = BASE - (c / maxC) * H;
+      fill += ` L ${x.toFixed(2)} ${y.toFixed(2)}`;
+      stroke += (i === 0 ? "M " : " L ") + `${x.toFixed(2)} ${y.toFixed(2)}`;
+    });
+    fill += ` L ${W} ${BASE} Z`;
+    // Mode x: index of max
+    const modeIdx = smooth.indexOf(maxC);
+    const modeX = (modeIdx / (bins - 1)) * W;
+    return { pathFill: fill, pathStroke: stroke, mode: modeX, lo, hi };
+  }, [distribution]);
+
+  const fmt = (n: number) =>
+    Math.abs(n) >= 100 ? n.toFixed(0) : Math.abs(n) >= 10 ? n.toFixed(1) : n.toFixed(2);
+
+  return (
+    <svg viewBox="0 0 200 78" className="mt-5 w-full" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id={`curveFill-${accent.replace(/[^\w]/g, "")}`} x1="0" x2="0" y1="0" y2="1">
+          <stop offset="0%" stopColor={accent} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={accent} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {/* Faint baseline grid */}
+      <line x1="0" y1="60" x2="200" y2="60" stroke="var(--rule)" strokeWidth="0.5" />
+      {/* Mode guide */}
+      <line
+        x1={mode}
+        x2={mode}
+        y1={6}
+        y2={60}
+        stroke={accent}
+        strokeOpacity="0.35"
+        strokeWidth="0.5"
+        strokeDasharray="1.5 2"
+      />
+      {/* Area */}
+      <path d={pathFill} fill={`url(#curveFill-${accent.replace(/[^\w]/g, "")})`} />
+      {/* Stroke */}
+      <path
+        d={pathStroke}
+        fill="none"
+        stroke={accent}
+        strokeWidth="0.8"
+        strokeLinejoin="round"
+        strokeLinecap="round"
+      />
+      {/* Tick labels */}
+      <text x="0" y="75" className="font-mono" fontSize="7" fill="var(--ink-dim)">
+        {fmt(lo)}
+      </text>
+      <text x="200" y="75" className="font-mono" fontSize="7" textAnchor="end" fill="var(--ink-dim)">
+        {fmt(hi)}
+      </text>
+    </svg>
+  );
+}
+
 export function VariableCard({
   variable,
   onChange,
-  onRemove
+  onRemove,
+  index
 }: {
   variable: MCVariable;
   onChange: (v: MCVariable) => void;
   onRemove: () => void;
+  index?: number;
 }) {
   const idPrefix = useId();
-  const histPath = useMemo(() => {
-    const samples = sampleDistribution(variable.distribution, 1000);
-    return histogramPath(samples, 100, 50, 20);
-  }, [variable.distribution]);
+  const accent = "var(--sec-mc, #c4d82e)";
+  const roman = ["i", "ii", "iii", "iv", "v", "vi", "vii", "viii", "ix", "x"];
+  const idx = typeof index === "number" ? roman[index] ?? `${index + 1}` : "";
 
   return (
-    <div className="border border-ink-dim/15 bg-paper p-4">
-      <div className="flex items-start justify-between gap-2">
+    <div className="relative specimen p-5 pb-6">
+      {/* Corner index + remove */}
+      <div className="absolute left-4 top-3 flex items-baseline gap-2 font-mono text-[9px] uppercase tracking-[0.3em] text-ink-dim">
+        <span>{idx}</span>
+        <span className="text-ink-faint">·</span>
+        <span>{kindLong(variable.distribution.kind)}</span>
+      </div>
+      <button
+        type="button"
+        aria-label="Remove variable"
+        onClick={onRemove}
+        className="absolute right-3 top-2 h-6 w-6 font-display text-[18px] leading-none text-ink-faint transition-colors hover:text-ink"
+      >
+        ×
+      </button>
+
+      {/* Name — big serif */}
+      <div className="mt-6">
         <input
           value={variable.name}
           onChange={(e) => onChange({ ...variable, name: e.target.value })}
-          className="flex-1 bg-transparent font-display text-[20px] text-ink focus:outline-none"
-          style={{ fontVariationSettings: '"opsz" 20, "wght" 500' }}
+          className="w-full bg-transparent font-display text-[28px] leading-none text-ink focus:outline-none"
+          style={{ fontVariationSettings: '"opsz" 44, "SOFT" 20, "wght" 380', letterSpacing: "-0.015em" }}
+          spellCheck={false}
         />
-        <button
-          type="button"
-          aria-label="Remove variable"
-          onClick={onRemove}
-          className="font-mono text-[11px] text-ink-dim hover:text-ink"
-        >
-          ✕
-        </button>
       </div>
 
-      <div className="mt-2 flex gap-1">
-        {KINDS.map(({ key, label }) => (
-          <button
-            key={key}
-            type="button"
-            onClick={() => onChange({ ...variable, distribution: defaultDistribution(key) })}
-            className={`rounded-none border px-2 py-0.5 font-mono text-[10px] ${
-              variable.distribution.kind === key
-                ? "border-ink bg-ink text-paper"
-                : "border-ink-dim/20 text-ink-dim hover:border-ink-dim"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      {/* Distribution picker — inline italic typographic, with underline on active */}
+      <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1">
+        {KINDS.map(({ key, long }) => {
+          const active = variable.distribution.kind === key;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onChange({ ...variable, distribution: defaultDistribution(key) })}
+              className={`font-display text-[12px] italic transition-colors ${
+                active ? "text-ink" : "text-ink-faint hover:text-ink-dim"
+              }`}
+              style={{
+                fontVariationSettings: '"opsz" 14, "wght" 380',
+                textDecoration: active ? "underline" : "none",
+                textUnderlineOffset: "3px",
+                textDecorationThickness: "1px"
+              }}
+            >
+              {long}
+            </button>
+          );
+        })}
       </div>
 
-      <div className="mt-3">
-        <ParamInputs
+      <div className="mt-5">
+        <ParamFields
           distribution={variable.distribution}
           onChange={(d) => onChange({ ...variable, distribution: d })}
           idPrefix={idPrefix}
         />
       </div>
 
-      <svg viewBox="0 0 100 50" className="mt-4 h-12 w-full">
-        <path d={histPath} fill="var(--sec-mc, #c4d82e)" fillOpacity={0.25} stroke="var(--sec-mc, #c4d82e)" strokeWidth={0.5} />
-      </svg>
+      <ProbabilityCurve distribution={variable.distribution} accent={accent} />
     </div>
   );
 }

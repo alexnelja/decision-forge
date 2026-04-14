@@ -130,3 +130,117 @@ body::after {
   height: 1px;
   background: var(--rule);
 }
+
+/* Numeric pull-quote — big editorial numeral */
+.numeral {
+  font-family: var(--font-display);
+  font-feature-settings: "ss01", "tnum", "lnum", "onum";
+  font-variation-settings: "opsz" 144, "SOFT" 20, "wght" 280;
+  line-height: 0.9;
+  letter-spacing: -0.04em;
+}
+
+/* Specimen card — subtle paper-within-paper */
+.specimen {
+  background: linear-gradient(180deg, rgba(255,255,255,0.015) 0%, transparent 40%), var(--paper);
+  border: 1px solid var(--rule);
+  position: relative;
+}
+.specimen::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--rule) 1px, transparent 1px);
+  background-size: 100% 24px;
+  opacity: 0.12;
+}
+
+/* Perforated slip — dashed edges like a tear-off receipt */
+.slip {
+  background: var(--paper-raised);
+  position: relative;
+  box-shadow:
+    0 1px 0 var(--rule),
+    0 20px 40px -20px rgba(0,0,0,0.7),
+    inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.slip::before,
+.slip::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background-image: radial-gradient(circle at 4px 3px, var(--paper) 2px, transparent 2.5px);
+  background-size: 8px 6px;
+  background-repeat: repeat-x;
+}
+.slip::before { top: -3px; }
+.slip::after { bottom: -3px; }
+
+/* Histogram bar reveal — pours in left-to-right */
+@keyframes barRise {
+  from { transform: scaleY(0); opacity: 0; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+.bar-rise {
+  transform-origin: bottom;
+  animation: barRise 520ms cubic-bezier(0.18, 0.75, 0.22, 1) both;
+}
+
+/* Draw-line animation — used for percentile markers and threshold */
+@keyframes drawLine {
+  from { stroke-dashoffset: 100; opacity: 0; }
+  to { stroke-dashoffset: 0; opacity: 1; }
+}
+.line-draw {
+  stroke-dasharray: 100;
+  animation: drawLine 650ms cubic-bezier(0.18, 0.75, 0.22, 1) both;
+}
+
+/* Shimmer-ink: run button awaiting click */
+@keyframes inkPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(196, 216, 46, 0); }
+  50%      { box-shadow: 0 0 0 6px rgba(196, 216, 46, 0.12); }
+}
+.ink-pulse {
+  animation: inkPulse 2800ms ease-in-out infinite;
+}
+
+/* Running indicator — slow mono typographic ellipsis */
+@keyframes ellipsis {
+  0%, 20%  { content: "."; }
+  40%      { content: ".."; }
+  60%, 100% { content: "…"; }
+}
+.running::after {
+  content: ".";
+  display: inline-block;
+  width: 1.2ch;
+  animation: ellipsis 1100ms steps(3, end) infinite;
+}
+
+/* Stamp — for "LOGGED" confirmation */
+.stamp {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border: 1.5px solid currentColor;
+  transform: rotate(-4deg);
+  opacity: 0.85;
+}
+
+/* Hairline grid background — graph paper */
+.graph-paper {
+  background-image:
+    linear-gradient(var(--rule) 1px, transparent 1px),
+    linear-gradient(90deg, var(--rule) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px;
+  background-position: -1px -1px;
+  background-color: var(--paper);
+}

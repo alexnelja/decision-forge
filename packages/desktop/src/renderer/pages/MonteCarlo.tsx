@@ -24,7 +24,6 @@ export default function MonteCarlo() {
   const config: MCConfig = { variables, formula, iterations };
 
   async function handleRun(cfg: MCConfig): Promise<MCRunResult> {
-    // SimulationPanel controls formula + iterations locally; sync up before the real call
     setFormula(cfg.formula);
     setIterations(cfg.iterations);
     const r = await mcApi.run(cfg);
@@ -58,33 +57,41 @@ export default function MonteCarlo() {
       accent="var(--sec-mc)"
       lede="Draw a distribution over every input you cannot pin down. Run the scenario ten thousand times. Read the shape of the possible, not the point."
       marginalia={
-        <div className="space-y-6">
+        <div className="space-y-7">
           {result && (
             <div>
-              <div className="eyebrow mb-2">Log to journal</div>
-              <LogForecastButton
-                result={result}
-                formula={formula}
-              />
+              <div className="eyebrow mb-3">Commit to a wager</div>
+              <LogForecastButton result={result} formula={formula} />
             </div>
           )}
+
+          {result && <div className="rule" />}
+
           <div>
-            <div className="eyebrow mb-2">Of note</div>
-            <p className="font-mono text-[11px] leading-[1.6] text-ink-dim">
-              "The map is not the territory. A good simulation is the map that admits it."
+            <div className="eyebrow mb-3">Colophon</div>
+            <p
+              className="font-display italic text-[14px] leading-[1.55] text-ink-dim"
+              style={{ fontVariationSettings: '"opsz" 16, "wght" 360' }}
+            >
+              "The map is not the territory. A good simulation is the map that
+              admits it."
             </p>
           </div>
+
           <div className="rule" />
+
           <div>
-            <div className="eyebrow mb-2">Telemetry</div>
-            <dl className="mt-1 space-y-1 font-mono text-[11px]">
+            <div className="eyebrow mb-3">Telemetry</div>
+            <dl className="mt-1 space-y-1.5 font-mono text-[11px]">
               <div className="flex justify-between">
                 <dt className="text-ink-dim">trials</dt>
-                <dd className="text-ink">{iterations.toLocaleString()}</dd>
+                <dd className="tabular-nums text-ink">
+                  {iterations.toLocaleString()}
+                </dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-ink-dim">variables</dt>
-                <dd className="text-ink">{variables.length}</dd>
+                <dd className="tabular-nums text-ink">{variables.length}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-ink-dim">resolved</dt>
@@ -92,30 +99,63 @@ export default function MonteCarlo() {
               </div>
             </dl>
           </div>
+
+          <div className="rule" />
+
+          <div>
+            <div className="eyebrow mb-3">Deferred</div>
+            <ul className="space-y-1.5 font-mono text-[10px] text-ink-faint">
+              <li>— 3D particle cloud</li>
+              <li>— SSE streaming progress</li>
+              <li>— Sobol sensitivity</li>
+              <li>— Compare-mode overlay</li>
+              <li>— Correlations, PERT, empirical</li>
+            </ul>
+            <p className="meta mt-2 italic">Plan 3.5</p>
+          </div>
         </div>
       }
     >
-      <div className="grid grid-cols-[minmax(280px,340px)_1fr] gap-8">
-        <div className="space-y-4">
-          <div className="eyebrow">I. Inputs</div>
+      <div className="grid grid-cols-[minmax(300px,360px)_1fr] gap-12">
+        {/* Inputs column */}
+        <div className="space-y-5">
+          <div className="flex items-baseline justify-between">
+            <div className="eyebrow">I. Inputs</div>
+            <span
+              className="font-mono text-[10px] text-ink-faint tabular-nums"
+              style={{ letterSpacing: "0.18em" }}
+            >
+              {variables.length.toString().padStart(2, "0")}
+            </span>
+          </div>
           {variables.map((v, i) => (
             <VariableCard
               key={i}
               variable={v}
               onChange={(u) => updateVariable(i, u)}
               onRemove={() => removeVariable(i)}
+              index={i}
             />
           ))}
           <button
             type="button"
             onClick={addVariable}
-            className="w-full border border-dashed border-ink-dim/40 bg-transparent px-4 py-2 font-mono text-[11px] text-ink-dim hover:border-ink hover:text-ink"
+            className="group w-full border border-dashed border-ink-faint/60 bg-transparent px-4 py-4 text-left font-display italic text-[15px] text-ink-dim transition-all hover:border-ink hover:text-ink"
+            style={{ fontVariationSettings: '"opsz" 18, "wght" 360' }}
           >
-            + Add variable
+            <span className="font-mono text-[11px] not-italic tracking-[0.2em] text-ink-faint group-hover:text-ink-dim">
+              +
+            </span>{" "}
+            Append a variable
           </button>
         </div>
-        <div className="space-y-6">
-          <div className="eyebrow">II. Engine</div>
+
+        {/* Engine column */}
+        <div className="space-y-10">
+          <div className="flex items-baseline justify-between border-b border-paper-rule pb-2">
+            <div className="eyebrow">II. Engine</div>
+            <span className="meta italic">Python sidecar · numpy-vectorised</span>
+          </div>
           <SimulationPanel config={config} onRun={handleRun} />
         </div>
       </div>
