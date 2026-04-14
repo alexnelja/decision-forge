@@ -1,6 +1,55 @@
+import { useState } from "react";
+import type { MCConfig, MCRunResult, MCVariable } from "@decision-forge/core";
 import { ModuleFrame } from "../components/ModuleFrame";
+import { mcApi } from "../lib/mc-api";
+import { VariableCard } from "./mc/VariableCard";
+import { SimulationPanel } from "./mc/SimulationPanel";
+import { LogForecastButton } from "./mc/LogForecastButton";
+
+const DEFAULT_CONFIG: MCConfig = {
+  variables: [
+    { name: "revenue", distribution: { kind: "normal", mean: 100, sd: 15 } },
+    { name: "cost", distribution: { kind: "triangular", min: 40, mode: 50, max: 70 } }
+  ],
+  formula: "revenue - cost",
+  iterations: 10_000
+};
 
 export default function MonteCarlo() {
+  const [variables, setVariables] = useState<MCVariable[]>(DEFAULT_CONFIG.variables);
+  const [formula, setFormula] = useState(DEFAULT_CONFIG.formula);
+  const [iterations, setIterations] = useState(DEFAULT_CONFIG.iterations);
+  const [result, setResult] = useState<MCRunResult | null>(null);
+
+  const config: MCConfig = { variables, formula, iterations };
+
+  async function handleRun(cfg: MCConfig): Promise<MCRunResult> {
+    // SimulationPanel controls formula + iterations locally; sync up before the real call
+    setFormula(cfg.formula);
+    setIterations(cfg.iterations);
+    const r = await mcApi.run(cfg);
+    setResult(r);
+    return r;
+  }
+
+  function updateVariable(index: number, updated: MCVariable) {
+    setVariables((prev) => prev.map((v, i) => (i === index ? updated : v)));
+  }
+
+  function removeVariable(index: number) {
+    setVariables((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function addVariable() {
+    setVariables((prev) => [
+      ...prev,
+      {
+        name: `x${prev.length + 1}`,
+        distribution: { kind: "normal", mean: 0, sd: 1 }
+      }
+    ]);
+  }
+
   return (
     <ModuleFrame
       section="§ I"
@@ -10,14 +59,15 @@ export default function MonteCarlo() {
       lede="Draw a distribution over every input you cannot pin down. Run the scenario ten thousand times. Read the shape of the possible, not the point."
       marginalia={
         <div className="space-y-6">
-          <div>
-            <div className="eyebrow mb-2">Arriving in</div>
-            <div className="font-display text-[18px] text-ink" style={{ fontVariationSettings: '"opsz" 18, "wght" 400' }}>
-              Plan III
+          {result && (
+            <div>
+              <div className="eyebrow mb-2">Log to journal</div>
+              <LogForecastButton
+                result={result}
+                formula={formula}
+              />
             </div>
-            <div className="meta mt-1">Simulation engine</div>
-          </div>
-          <div className="rule" />
+          )}
           <div>
             <div className="eyebrow mb-2">Of note</div>
             <p className="font-mono text-[11px] leading-[1.6] text-ink-dim">
@@ -28,49 +78,46 @@ export default function MonteCarlo() {
           <div>
             <div className="eyebrow mb-2">Telemetry</div>
             <dl className="mt-1 space-y-1 font-mono text-[11px]">
-              <div className="flex justify-between"><dt className="text-ink-dim">trials</dt><dd className="text-ink">10,000</dd></div>
-              <div className="flex justify-between"><dt className="text-ink-dim">seed</dt><dd className="text-ink">—</dd></div>
-              <div className="flex justify-between"><dt className="text-ink-dim">runtime</dt><dd className="text-ink">&lt; 1s</dd></div>
+              <div className="flex justify-between">
+                <dt className="text-ink-dim">trials</dt>
+                <dd className="text-ink">{iterations.toLocaleString()}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-ink-dim">variables</dt>
+                <dd className="text-ink">{variables.length}</dd>
+              </div>
+              <div className="flex justify-between">
+                <dt className="text-ink-dim">resolved</dt>
+                <dd className="text-ink">{result ? "✓" : "—"}</dd>
+              </div>
             </dl>
           </div>
         </div>
       }
     >
-      <div className="grid grid-cols-2 gap-8">
-        <div className="border-t border-paper-rule pt-4">
-          <div className="eyebrow mb-3">I. Inputs</div>
-          <p className="font-display text-[15px] leading-[1.55] text-ink/85" style={{ fontVariationSettings: '"opsz" 16' }}>
-            Declare each variable as a range or a distribution — triangular for gut feel, normal for well-measured, lognormal for the long tail.
-          </p>
+      <div className="grid grid-cols-[minmax(280px,340px)_1fr] gap-8">
+        <div className="space-y-4">
+          <div className="eyebrow">I. Inputs</div>
+          {variables.map((v, i) => (
+            <VariableCard
+              key={i}
+              variable={v}
+              onChange={(u) => updateVariable(i, u)}
+              onRemove={() => removeVariable(i)}
+            />
+          ))}
+          <button
+            type="button"
+            onClick={addVariable}
+            className="w-full border border-dashed border-ink-dim/40 bg-transparent px-4 py-2 font-mono text-[11px] text-ink-dim hover:border-ink hover:text-ink"
+          >
+            + Add variable
+          </button>
         </div>
-        <div className="border-t border-paper-rule pt-4">
-          <div className="eyebrow mb-3">II. Engine</div>
-          <p className="font-display text-[15px] leading-[1.55] text-ink/85" style={{ fontVariationSettings: '"opsz" 16' }}>
-            The Python sidecar draws samples, evaluates the model, and returns the full empirical distribution. No point estimate hides the variance.
-          </p>
+        <div className="space-y-6">
+          <div className="eyebrow">II. Engine</div>
+          <SimulationPanel config={config} onRun={handleRun} />
         </div>
-        <div className="border-t border-paper-rule pt-4">
-          <div className="eyebrow mb-3">III. Verdict</div>
-          <p className="font-display text-[15px] leading-[1.55] text-ink/85" style={{ fontVariationSettings: '"opsz" 16' }}>
-            Histograms, percentiles (P5 / P50 / P95), and the fraction of worlds in which the decision regrets itself.
-          </p>
-        </div>
-        <div className="border-t border-paper-rule pt-4">
-          <div className="eyebrow mb-3">IV. Provenance</div>
-          <p className="font-display text-[15px] leading-[1.55] text-ink/85" style={{ fontVariationSettings: '"opsz" 16' }}>
-            Every run pinned to a seed, serialised under <span className="font-mono text-[13px]">~/DecisionForge/</span>, and archivable into the scenario that spawned it.
-          </p>
-        </div>
-      </div>
-
-      <div className="mt-10 p-6 border border-paper-rule" style={{ background: "var(--paper-raised)" }}>
-        <div className="flex items-center gap-3">
-          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--sec-mc)" }} />
-          <span className="eyebrow">Coming in Plan 3</span>
-        </div>
-        <p className="mt-3 font-display text-[17px] text-ink-dim" style={{ fontVariationSettings: '"opsz" 18, "wght" 350' }}>
-          This section is set but unwritten. The typesetter holds the matrices.
-        </p>
       </div>
     </ModuleFrame>
   );

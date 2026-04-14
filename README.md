@@ -9,12 +9,12 @@ Plan 1 (current): `../docs/superpowers/plans/2026-04-13-decision-forge-plan-1-fo
 
 ## Status
 
-**Plan 2 — Forecast Journal complete (2026-04-14).** Working calibration journal: ask questions with probabilities, log predictions, resolve outcomes, view overall Brier score and 10-bucket reliability plot. SQLite at `~/DecisionForge/forecasts.db`, Python sidecar computes calibration math, Electron bridges IPC → REST. Monte Carlo (Plan 3) and Negotiation Dojo (Plan 4) remain stubs.
+**Plans 2 & 3 complete (2026-04-14).** Forecast Journal and Monte Carlo Sandbox both ship. Open a question, log a probability, run a 10k-iteration simulation, log a forecast derived from any percentile, watch calibration accumulate over time. Negotiation Dojo (Plan 4) still a stub.
 
 What exists in `packages/`:
-- **`core/`** — shared TS library. Zod schemas (`scenario`, `forecast` — full; `mc-config`, `nego-config` placeholders), path helpers, vitest suite.
-- **`desktop/`** — Electron app. Main process (`index.ts`, `preload.ts`, `sidecar.ts` supervisor, `scenarios.ts`, `forecast.ts` IPC, `keychain.ts` stub), React renderer (Vite + Tailwind + framer-motion) with working Forecast page (AskForm, QuestionList, ResolveDialog, Calibration, SeedButton) and stubs for Monte Carlo / Negotiation.
-- **`py-engine/`** — FastAPI sidecar with `/health` and `/forecast` routers, SQLite persistence (`db.py`), calibration math (`calibration.py`), pytest.
+- **`core/`** — shared TS library. Zod schemas (`scenario`, `forecast`, `mc-config` — full; `nego-config` still placeholder), path helpers, vitest suite.
+- **`desktop/`** — Electron app. Main process includes Scenario I/O, Forecast IPC, MC IPC, sidecar supervisor, keychain stub. Renderer has working Forecast page (ask/list/resolve/calibrate) and Monte Carlo page (VariableCard → SimulationPanel → LogForecastButton bridging § I → § III).
+- **`py-engine/`** — FastAPI sidecar: `/health`, `/forecast` (SQLite persistence + Brier calibration), `/mc/run` (numpy-vectorised sampling, safe formula eval, truncated wire payload). 38 pytest tests.
 - **`cli/`** — CLI stub with version command.
 
 ## Setup & Run

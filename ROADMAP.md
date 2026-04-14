@@ -23,12 +23,24 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [x] Electron IPC bridge to sidecar (main + preload + renderer `forecast-api`)
 - [x] Playwright e2e: ask → resolve → calibration roundtrip
 
-## Plan 3 — Monte Carlo Sandbox
+## Plan 3 — Monte Carlo Sandbox ✅ complete (2026-04-14)
 
-- [ ] `MCConfigSchema` (replace placeholder in `packages/core/src/schemas/mc-config.ts`)
-- [ ] Simulation engine in `py-engine` (distributions, correlations, sensitivity)
-- [ ] Results visualisation (histograms, tornado, scenario compare)
-- [ ] Save/load scenarios as JSON
+- [x] `MCConfigSchema` (full — normal/lognormal/triangular/uniform/pert/empirical)
+- [x] Simulation engine in `py-engine` — numpy samplers, safe formula evaluator, summary stats
+- [x] `/mc/run` endpoint with deterministic seeding and 1000-point wire truncation
+- [x] VariableCard with live client-side mini-histogram (Box-Muller, no sidecar round-trip)
+- [x] SimulationPanel with 40-bin outcome histogram, P5/P50/P95 column, threshold slider
+- [x] LogForecastButton bridges § I → § III (log from any percentile)
+- [x] MonteCarlo page wired with revenue-cost default config
+- [x] Playwright e2e: run → log P90 → appears in Forecast journal
+
+### Deferred to Plan 3.5 (intentional)
+- 3D particle cloud (react-three-fiber)
+- SSE streaming of run progress
+- Sobol sensitivity (SAlib)
+- Compare mode (two scenarios overlaid)
+- Correlations between variables (schema ready; sampler ignores)
+- Empirical + PERT sampling (schema ready; not wired)
 
 ## Plan 4 — Negotiation Dojo
 
