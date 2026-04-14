@@ -1,73 +1,107 @@
+import { useEffect, useState } from "react";
+import type { NegoConfig, NegoSessionState } from "@decision-forge/core";
 import { ModuleFrame } from "../components/ModuleFrame";
+import { KeyPrompt } from "./nego/KeyPrompt";
+import { Setup } from "./nego/Setup";
+import { SessionView, Debrief } from "./nego/SessionView";
+import { negoApi, keychainApi, type NegoDebrief } from "../lib/nego-api";
+
+type Phase = "loading" | "need-key" | "setup" | "active" | "debrief";
 
 export default function Negotiation() {
+  const [phase, setPhase] = useState<Phase>("loading");
+  const [session, setSession] = useState<NegoSessionState | null>(null);
+  const [debrief, setDebrief] = useState<NegoDebrief | null>(null);
+
+  useEffect(() => {
+    keychainApi.has().then((has) => setPhase(has ? "setup" : "need-key"));
+  }, []);
+
+  async function launch(config: NegoConfig) {
+    const s = await negoApi.start(config);
+    setSession(s);
+    setPhase(s.outcome === "active" ? "active" : "debrief");
+    if (s.outcome !== "active") {
+      const d = await negoApi.debrief(s.id);
+      setDebrief(d);
+    }
+  }
+
+  async function onFinished(s: NegoSessionState) {
+    const d = await negoApi.debrief(s.id);
+    setSession(s);
+    setDebrief(d);
+    setPhase("debrief");
+  }
+
+  function reset() {
+    setSession(null);
+    setDebrief(null);
+    setPhase("setup");
+  }
+
   return (
     <ModuleFrame
       section="§ II"
-      kicker="Rehearsal"
+      kicker="Persuasion"
       title="Negotiation Dojo"
       accent="var(--sec-nego)"
-      lede="A training partner for the conversation you cannot afford to rehearse on a real counterparty. Scenarios, transcripts, and the coach who reads them back to you."
+      lede="A rehearsal room. An opposite number with nerve and guile. Ten rounds to find a handshake or walk with your BATNA intact."
       marginalia={
         <div className="space-y-6">
           <div>
-            <div className="eyebrow mb-2">Arriving in</div>
-            <div className="font-display text-[18px] text-ink" style={{ fontVariationSettings: '"opsz" 18, "wght" 400' }}>
-              Plan IV
-            </div>
-            <div className="meta mt-1">Anthropic via keytar</div>
+            <div className="eyebrow mb-2">Stage directions</div>
+            <p
+              className="font-display italic text-[13px] leading-[1.55] text-ink-dim"
+              style={{ fontVariationSettings: '"opsz" 14, "wght" 360' }}
+            >
+              The dojo plays with a single issue at first. Multi-issue trades
+              arrive in Plan 4.5. Nothing leaves your machine except the
+              model's own tokens, and even those take their leave via your
+              OS keychain, not a file.
+            </p>
           </div>
           <div className="rule" />
           <div>
-            <div className="eyebrow mb-2">Ground rules</div>
-            <ul className="mt-1 font-mono text-[11px] leading-[1.7] text-ink-dim space-y-1">
-              <li>→ one scenario at a time</li>
-              <li>→ transcripts stay local</li>
-              <li>→ coach reads last turn</li>
+            <div className="eyebrow mb-2">Conduct</div>
+            <ul className="space-y-1.5 font-mono text-[11px] text-ink-dim">
+              <li>— One issue, two seats</li>
+              <li>— Persona-shaped agent</li>
+              <li>— BATNA never revealed</li>
+              <li>— Walk is always an option</li>
             </ul>
           </div>
+          {phase !== "need-key" && phase !== "loading" && (
+            <>
+              <div className="rule" />
+              <button
+                type="button"
+                onClick={async () => {
+                  await keychainApi.clear();
+                  setPhase("need-key");
+                }}
+                className="font-mono text-[10px] uppercase tracking-[0.28em] text-ink-dim hover:text-ink"
+              >
+                Forget API key
+              </button>
+            </>
+          )}
         </div>
       }
     >
-      <blockquote
-        className="border-l-2 pl-6 py-2"
-        style={{ borderColor: "var(--sec-nego)" }}
-      >
-        <p
-          className="font-display italic text-[28px] leading-[1.25] text-ink"
-          style={{ fontVariationSettings: '"opsz" 48, "SOFT" 60, "wght" 360' }}
-        >
-          "The skill of negotiation is not in the words you say,
-          but in the sentences you leave unfinished."
-        </p>
-        <footer className="mt-3 eyebrow">from the editor's notebook</footer>
-      </blockquote>
-
-      <div className="grid grid-cols-3 gap-6 mt-12">
-        {[
-          { n: "01", label: "Brief", body: "Who you are, who they are, what they want, what you want, what you won't give." },
-          { n: "02", label: "Round", body: "Exchange turns with a counterparty tuned to the scenario. The coach watches." },
-          { n: "03", label: "Read-back", body: "The coach annotates the transcript: where you leaked, where you held, where you fumbled the ask." }
-        ].map((s) => (
-          <div key={s.n} className="border-t border-paper-rule pt-4">
-            <div className="font-mono text-[11px] text-ink-faint mb-2">{s.n}</div>
-            <div className="eyebrow mb-2" style={{ color: "var(--sec-nego)" }}>{s.label}</div>
-            <p className="font-display text-[14px] leading-[1.55] text-ink/85" style={{ fontVariationSettings: '"opsz" 16' }}>
-              {s.body}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-10 p-6 border border-paper-rule" style={{ background: "var(--paper-raised)" }}>
-        <div className="flex items-center gap-3">
-          <span className="inline-block w-1.5 h-1.5 rounded-full" style={{ background: "var(--sec-nego)" }} />
-          <span className="eyebrow">Coming in Plan 4</span>
-        </div>
-        <p className="mt-3 font-display text-[17px] text-ink-dim" style={{ fontVariationSettings: '"opsz" 18, "wght" 350' }}>
-          The dojo is swept; the mats are laid; the partner is not yet installed.
-        </p>
-      </div>
+      {phase === "loading" && <p className="meta italic">Reading the keychain…</p>}
+      {phase === "need-key" && <KeyPrompt onReady={() => setPhase("setup")} />}
+      {phase === "setup" && <Setup onLaunch={launch} />}
+      {phase === "active" && session && (
+        <SessionView
+          state={session}
+          onUpdate={(s) => setSession(s)}
+          onFinished={onFinished}
+        />
+      )}
+      {phase === "debrief" && session && debrief && (
+        <Debrief state={session} debrief={debrief} onAgain={reset} />
+      )}
     </ModuleFrame>
   );
 }

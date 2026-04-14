@@ -22,6 +22,21 @@ type McApi = {
   }>;
 };
 
+type NegoApi = {
+  start: (config: unknown) => Promise<unknown>;
+  list: () => Promise<Array<Record<string, unknown>>>;
+  state: (sessionId: string) => Promise<unknown>;
+  action: (sessionId: string, action: unknown) => Promise<unknown>;
+  debrief: (sessionId: string) => Promise<unknown>;
+};
+
+type KeychainApi = {
+  get: () => Promise<string | null>;
+  set: (key: string) => Promise<void>;
+  clear: () => Promise<void>;
+  has: () => Promise<boolean>;
+};
+
 const scenarios: ScenarioApi = {
   list: () => ipcRenderer.invoke("scenarios:list"),
   load: (id) => ipcRenderer.invoke("scenarios:load", id),
@@ -40,9 +55,26 @@ const mc: McApi = {
   run: (config) => ipcRenderer.invoke("mc:run", config)
 };
 
+const nego: NegoApi = {
+  start: (config) => ipcRenderer.invoke("nego:start", config),
+  list: () => ipcRenderer.invoke("nego:list"),
+  state: (id) => ipcRenderer.invoke("nego:state", id),
+  action: (id, action) => ipcRenderer.invoke("nego:action", id, action),
+  debrief: (id) => ipcRenderer.invoke("nego:debrief", id)
+};
+
+const keychain: KeychainApi = {
+  get: () => ipcRenderer.invoke("keychain:get"),
+  set: (key) => ipcRenderer.invoke("keychain:set", key),
+  clear: () => ipcRenderer.invoke("keychain:clear"),
+  has: () => ipcRenderer.invoke("keychain:has")
+};
+
 contextBridge.exposeInMainWorld("api", {
   sidecarUrl: () => (process.env.SIDECAR_URL ?? "http://127.0.0.1:8765"),
   scenarios,
   forecast,
-  mc
+  mc,
+  nego,
+  keychain
 });

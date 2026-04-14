@@ -1,4 +1,9 @@
-import type { CalibrationReport } from "@decision-forge/core";
+import type {
+  CalibrationReport,
+  NegoConfig,
+  NegoAction,
+  NegoSessionState
+} from "@decision-forge/core";
 
 declare global {
   interface Window {
@@ -15,6 +20,26 @@ declare global {
         resolve: (r: unknown) => Promise<{ ok: true }>;
         list: () => Promise<Array<Record<string, unknown>>>;
         calibration: () => Promise<CalibrationReport>;
+      };
+      mc: {
+        run: (config: unknown) => Promise<{
+          samples: number[];
+          stats: Record<string, number>;
+          iterations: number;
+        }>;
+      };
+      nego: {
+        start: (config: NegoConfig) => Promise<NegoSessionState>;
+        list: () => Promise<Array<Record<string, unknown>>>;
+        state: (sessionId: string) => Promise<NegoSessionState>;
+        action: (sessionId: string, action: NegoAction) => Promise<NegoSessionState>;
+        debrief: (sessionId: string) => Promise<Record<string, unknown>>;
+      };
+      keychain: {
+        get: () => Promise<string | null>;
+        set: (key: string) => Promise<void>;
+        clear: () => Promise<void>;
+        has: () => Promise<boolean>;
       };
     };
   }

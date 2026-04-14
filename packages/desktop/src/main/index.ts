@@ -4,6 +4,13 @@ import { startSidecar, defaultEnginePaths, Sidecar } from "./sidecar.js";
 import { registerScenarioIpc } from "./scenarios.js";
 import { registerForecastIpc } from "./forecast.js";
 import { registerMcIpc } from "./mc.js";
+import { registerNegoIpc } from "./nego.js";
+import {
+  getAnthropicKey,
+  setAnthropicKey,
+  clearAnthropicKey,
+  hasAnthropicKey
+} from "./keychain.js";
 
 const PORT = 8765;
 let sidecar: Sidecar | null = null;
@@ -31,10 +38,24 @@ async function createWindow(): Promise<void> {
 app.whenReady().then(async () => {
   const repoRoot = path.resolve(__dirname, "../../../..");
   const { engineDir, pythonExecutable } = defaultEnginePaths(repoRoot);
-  sidecar = await startSidecar({ engineDir, pythonExecutable, port: PORT });
+
+  // Pass Anthropic key into the sidecar env at spawn time so /nego/* can call the real API
+  const anthropicKey = await getAnthropicKey();
+  const extraEnv: Record<string, string> = {};
+  if (anthropicKey) extraEnv.ANTHROPIC_API_KEY = anthropicKey;
+
+  sidecar = await startSidecar({ engineDir, pythonExecutable, port: PORT, env: extraEnv });
   registerScenarioIpc();
   registerForecastIpc(sidecar.baseUrl);
   registerMcIpc(sidecar.baseUrl);
+  registerNegoIpc(sidecar.baseUrl);
+
+  // Keychain IPC
+  ipcMain.handle("keychain:get", () => getAnthropicKey());
+  ipcMain.handle("keychain:set", (_e, key) => setAnthropicKey(key));
+  ipcMain.handle("keychain:clear", () => clearAnthropicKey());
+  ipcMain.handle("keychain:has", () => hasAnthropicKey());
+
   ipcMain.handle("sidecar:url", () => sidecar?.baseUrl ?? "");
   await createWindow();
 });
