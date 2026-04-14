@@ -6,6 +6,7 @@ import path from "node:path";
 export default defineConfig({
   root: path.resolve(__dirname),
   plugins: [react()],
+  base: "./",
   server: { port: 5273 },
   build: {
     outDir: "dist/renderer",
