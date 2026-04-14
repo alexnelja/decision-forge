@@ -14,6 +14,14 @@ type ForecastApi = {
   calibration: () => Promise<unknown>;
 };
 
+type McApi = {
+  run: (config: unknown) => Promise<{
+    samples: number[];
+    stats: Record<string, number>;
+    iterations: number;
+  }>;
+};
+
 const scenarios: ScenarioApi = {
   list: () => ipcRenderer.invoke("scenarios:list"),
   load: (id) => ipcRenderer.invoke("scenarios:load", id),
@@ -28,8 +36,13 @@ const forecast: ForecastApi = {
   calibration: () => ipcRenderer.invoke("forecast:calibration")
 };
 
+const mc: McApi = {
+  run: (config) => ipcRenderer.invoke("mc:run", config)
+};
+
 contextBridge.exposeInMainWorld("api", {
   sidecarUrl: () => (process.env.SIDECAR_URL ?? "http://127.0.0.1:8765"),
   scenarios,
-  forecast
+  forecast,
+  mc
 });
