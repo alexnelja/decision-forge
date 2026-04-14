@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain } from "electron";
 import path from "node:path";
 import { startSidecar, defaultEnginePaths, Sidecar } from "./sidecar.js";
 import { registerScenarioIpc } from "./scenarios.js";
+import { registerForecastIpc } from "./forecast.js";
 
 const PORT = 8765;
 let sidecar: Sidecar | null = null;
@@ -31,6 +32,7 @@ app.whenReady().then(async () => {
   const { engineDir, pythonExecutable } = defaultEnginePaths(repoRoot);
   sidecar = await startSidecar({ engineDir, pythonExecutable, port: PORT });
   registerScenarioIpc();
+  registerForecastIpc(sidecar.baseUrl);
   ipcMain.handle("sidecar:url", () => sidecar?.baseUrl ?? "");
   await createWindow();
 });
