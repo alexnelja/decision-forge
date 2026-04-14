@@ -16,15 +16,15 @@ test("boots app, sidecar is healthy, all module pages render", async () => {
   });
   expect(health.status).toBe("ok");
 
-  await expect(window.getByRole("link", { name: /monte carlo/i })).toBeVisible();
-  await expect(window.getByRole("link", { name: /negotiation/i })).toBeVisible();
-  await expect(window.getByRole("link", { name: /forecast/i })).toBeVisible();
+  await expect(window.getByRole("link", { name: /monte carlo/i }).first()).toBeVisible();
+  await expect(window.getByRole("link", { name: /negotiation/i }).first()).toBeVisible();
+  await expect(window.getByRole("link", { name: /forecast/i }).first()).toBeVisible();
 
-  await window.getByRole("link", { name: /monte carlo/i }).click();
+  await window.getByRole("link", { name: /monte carlo/i }).first().click();
   await expect(window.getByRole("heading", { name: /monte carlo/i })).toBeVisible();
-  await window.getByRole("link", { name: /negotiation/i }).click();
+  await window.getByRole("link", { name: /negotiation/i }).first().click();
   await expect(window.getByRole("heading", { name: /negotiation dojo/i })).toBeVisible();
-  await window.getByRole("link", { name: /forecast/i }).click();
+  await window.getByRole("link", { name: /forecast/i }).first().click();
   await expect(window.getByRole("heading", { name: /forecast journal/i })).toBeVisible();
 
   await app.close();

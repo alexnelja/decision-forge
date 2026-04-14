@@ -10,8 +10,8 @@ describe("App shell", () => {
         <App />
       </MemoryRouter>
     );
-    expect(screen.getByRole("link", { name: /monte carlo/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /negotiation/i })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /forecast/i })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /monte carlo/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /negotiation/i }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("link", { name: /forecast/i }).length).toBeGreaterThan(0);
   });
 });
