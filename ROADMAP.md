@@ -13,13 +13,15 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [ ] Scenario JSON persistence under `~/DecisionForge/`
 - [ ] Plan 1 Definition-of-Done checklist complete
 
-## Plan 2 — Forecast Journal
+## Plan 2 — Forecast Journal ✅ complete (2026-04-14)
 
-- [ ] SQLite schema at `~/DecisionForge/forecasts.db`
-- [ ] `ForecastSchema` (replace `z.unknown()` placeholder in `packages/core/src/schemas/forecast.ts`)
-- [ ] CRUD flows (create / resolve / list) in renderer
-- [ ] Calibration scoring (Brier, log score, buckets) in py-engine
-- [ ] Journal page UI
+- [x] SQLite schema at `~/DecisionForge/forecasts.db` (questions, predictions, resolutions)
+- [x] Forecast Zod schemas (Question, Prediction, Resolution, CalibrationReport)
+- [x] CRUD flows (ask / predict / resolve / list) via `/forecast` REST endpoints
+- [x] Calibration scoring (Brier, 10-bucket reliability decomposition) in py-engine
+- [x] Journal page UI — AskForm, QuestionList, ResolveDialog, Calibration plot, SeedButton
+- [x] Electron IPC bridge to sidecar (main + preload + renderer `forecast-api`)
+- [x] Playwright e2e: ask → resolve → calibration roundtrip
 
 ## Plan 3 — Monte Carlo Sandbox
 
