@@ -1,3 +1,5 @@
+import type { CalibrationReport } from "@decision-forge/core";
+
 declare global {
   interface Window {
     api: {
@@ -6,6 +8,13 @@ declare global {
         list: () => Promise<Array<{ id: string; name: string }>>;
         load: (id: string) => Promise<unknown>;
         save: (scenario: unknown) => Promise<void>;
+      };
+      forecast: {
+        ask: (body: unknown) => Promise<{ ok: true }>;
+        predict: (p: unknown) => Promise<{ ok: true }>;
+        resolve: (r: unknown) => Promise<{ ok: true }>;
+        list: () => Promise<Array<Record<string, unknown>>>;
+        calibration: () => Promise<CalibrationReport>;
       };
     };
   }
