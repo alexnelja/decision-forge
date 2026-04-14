@@ -34,13 +34,14 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [x] MonteCarlo page wired with revenue-cost default config
 - [x] Playwright e2e: run → log P90 → appears in Forecast journal
 
-### Deferred to Plan 3.5 (intentional)
-- 3D particle cloud (react-three-fiber)
-- SSE streaming of run progress
-- Sobol sensitivity (SAlib)
-- Compare mode (two scenarios overlaid)
-- Correlations between variables (schema ready; sampler ignores)
-- Empirical + PERT sampling (schema ready; not wired)
+### Plan 3.5 status (partially complete 2026-04-14)
+- [x] PERT + empirical sampling (py-engine and renderer preview)
+- [x] Variable correlations (Iman-Conover rank-reordering preserving marginals)
+- [x] First-order sensitivity ranking (Spearman² bars)
+- [ ] 3D particle cloud (react-three-fiber) — deferred
+- [ ] SSE streaming of run progress — deferred (polling sufficient for <200ms runs)
+- [ ] Sobol total-order indices (SAlib) — deferred
+- [ ] Compare mode (two scenarios overlaid) — deferred
 
 ## Plan 4 — Negotiation Dojo ✅ complete (2026-04-14)
 
