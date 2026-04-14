@@ -40,6 +40,39 @@ export function sampleTriangular(n: number, min: number, mode: number, max: numb
   return out;
 }
 
+// Beta-PERT via two gammas (Marsaglia-Tsang lite; for preview only)
+function sampleBeta(n: number, alpha: number, beta: number): number[] {
+  // Cheap: draw two gammas via summing exponentials. For preview quality only.
+  const out = new Array<number>(n);
+  for (let i = 0; i < n; i++) {
+    let gA = 0, gB = 0;
+    const ka = Math.max(1, Math.round(alpha));
+    const kb = Math.max(1, Math.round(beta));
+    for (let k = 0; k < ka; k++) gA -= Math.log(Math.random() || 1e-12);
+    for (let k = 0; k < kb; k++) gB -= Math.log(Math.random() || 1e-12);
+    out[i] = gA / (gA + gB);
+  }
+  return out;
+}
+
+export function samplePert(n: number, min: number, mode: number, max: number, lam = 4): number[] {
+  if (max <= min) return new Array(n).fill(min);
+  const span = max - min;
+  const alpha = (lam * (mode - min)) / span + 1;
+  const beta = lam + 2 - alpha;
+  const u = sampleBeta(n, alpha, beta);
+  return u.map((v) => min + v * span);
+}
+
+export function sampleFromEmpirical(n: number, samples: number[]): number[] {
+  if (samples.length === 0) return [];
+  const out = new Array<number>(n);
+  for (let i = 0; i < n; i++) {
+    out[i] = samples[Math.floor(Math.random() * samples.length)];
+  }
+  return out;
+}
+
 export function sampleDistribution(dist: Distribution, n = 1000): number[] {
   switch (dist.kind) {
     case "normal":
@@ -50,7 +83,10 @@ export function sampleDistribution(dist: Distribution, n = 1000): number[] {
       return sampleUniform(n, dist.min, dist.max);
     case "triangular":
       return sampleTriangular(n, dist.min, dist.mode, dist.max);
-    // pert / empirical not supported client-side in Plan 3
+    case "pert":
+      return samplePert(n, dist.min, dist.mode, dist.max, dist.lambda ?? 4);
+    case "empirical":
+      return sampleFromEmpirical(n, dist.samples);
     default:
       return [];
   }

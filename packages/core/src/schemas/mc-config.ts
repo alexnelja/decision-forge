@@ -94,9 +94,17 @@ export const MCStatsSchema = z.object({
 });
 export type MCStats = z.infer<typeof MCStatsSchema>;
 
+export const MCSensitivityRowSchema = z.object({
+  name: z.string(),
+  index: z.number(),
+  normalised: z.number()
+});
+export type MCSensitivityRow = z.infer<typeof MCSensitivityRowSchema>;
+
 export const MCRunResultSchema = z.object({
   samples: z.array(z.number()),
   stats: MCStatsSchema,
-  iterations: z.number().int().positive()
+  iterations: z.number().int().positive(),
+  sensitivity: z.array(MCSensitivityRowSchema).optional()
 });
 export type MCRunResult = z.infer<typeof MCRunResultSchema>;

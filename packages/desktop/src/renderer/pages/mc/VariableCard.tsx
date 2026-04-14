@@ -6,7 +6,9 @@ const KINDS: Array<{ key: Distribution["kind"]; label: string; long: string }> =
   { key: "normal", label: "N", long: "Normal" },
   { key: "lognormal", label: "LN", long: "Log-normal" },
   { key: "triangular", label: "T", long: "Triangular" },
-  { key: "uniform", label: "U", long: "Uniform" }
+  { key: "uniform", label: "U", long: "Uniform" },
+  { key: "pert", label: "P", long: "PERT" },
+  { key: "empirical", label: "E", long: "Empirical" }
 ];
 
 function defaultDistribution(kind: Distribution["kind"]): Distribution {
@@ -19,6 +21,10 @@ function defaultDistribution(kind: Distribution["kind"]): Distribution {
       return { kind: "triangular", min: 0, mode: 1, max: 2 };
     case "uniform":
       return { kind: "uniform", min: 0, max: 1 };
+    case "pert":
+      return { kind: "pert", min: 0, mode: 1, max: 2 };
+    case "empirical":
+      return { kind: "empirical", samples: [0, 1, 2, 3] };
     default:
       return { kind: "normal", mean: 0, sd: 1 };
   }
@@ -147,8 +153,55 @@ function ParamFields({
           />
         </div>
       );
+    case "pert":
+      return (
+        <div className="grid grid-cols-3 gap-x-6 gap-y-3">
+          <LedgerInput
+            id={`${idPrefix}-pmin`}
+            label="Min"
+            value={distribution.min}
+            onChange={(n) => onChange({ ...distribution, min: n })}
+          />
+          <LedgerInput
+            id={`${idPrefix}-pmode`}
+            label="Likely"
+            value={distribution.mode}
+            onChange={(n) => onChange({ ...distribution, mode: n })}
+          />
+          <LedgerInput
+            id={`${idPrefix}-pmax`}
+            label="Max"
+            value={distribution.max}
+            onChange={(n) => onChange({ ...distribution, max: n })}
+          />
+        </div>
+      );
+    case "empirical":
+      return (
+        <div>
+          <label htmlFor={`${idPrefix}-samples`} className="eyebrow mb-1 block">
+            Samples (comma-separated)
+          </label>
+          <textarea
+            id={`${idPrefix}-samples`}
+            value={distribution.samples.join(", ")}
+            onChange={(e) => {
+              const parsed = e.target.value
+                .split(",")
+                .map((s) => parseFloat(s.trim()))
+                .filter((n) => Number.isFinite(n));
+              onChange({
+                ...distribution,
+                samples: parsed.length > 0 ? parsed : distribution.samples
+              });
+            }}
+            rows={2}
+            className="w-full resize-none border-0 border-b border-ink-faint bg-transparent pb-1 font-mono text-[12px] text-ink focus:border-ink focus:outline-none"
+          />
+        </div>
+      );
     default:
-      return <p className="meta">Distribution kind not editable in Plan 3.</p>;
+      return <p className="meta">Distribution kind not editable.</p>;
   }
 }
 

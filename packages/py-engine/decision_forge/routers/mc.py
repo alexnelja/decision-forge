@@ -7,8 +7,13 @@ import numpy as np
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from decision_forge.mc.correlate import (
+    correlation_matrix_from_pairs,
+    induce_correlation,
+)
 from decision_forge.mc.evaluate import evaluate_formula
 from decision_forge.mc.sampling import sample
+from decision_forge.mc.sensitivity import sensitivity_ranking
 from decision_forge.mc.stats import summarise
 
 
@@ -18,6 +23,7 @@ router = APIRouter(prefix="/mc")
 class VariableIn(BaseModel):
     name: str
     distribution: dict[str, Any]
+    correlations: Optional[dict[str, float]] = None
 
 
 class MCConfigIn(BaseModel):
@@ -40,6 +46,22 @@ def run(cfg: MCConfigIn) -> dict:
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    # Apply correlations if any variable declares them
+    pairs: dict[str, dict[str, float]] = {}
+    for var in cfg.variables:
+        if var.correlations:
+            pairs[var.name] = dict(var.correlations)
+    if pairs:
+        names = [v.name for v in cfg.variables]
+        target = correlation_matrix_from_pairs(names, pairs)
+        try:
+            variables = induce_correlation(variables, target, names)
+        except np.linalg.LinAlgError as exc:
+            raise HTTPException(
+                status_code=400,
+                detail=f"correlation matrix not positive semi-definite: {exc}"
+            ) from exc
+
     try:
         outcome = evaluate_formula(cfg.formula, variables)
     except ValueError as exc:
@@ -48,15 +70,14 @@ def run(cfg: MCConfigIn) -> dict:
         raise HTTPException(status_code=400, detail=f"formula references unknown name: {exc}") from exc
 
     if outcome.ndim == 0:
-        # scalar result — broadcast to full iterations
         outcome = np.full(cfg.iterations, float(outcome))
 
     if not np.all(np.isfinite(outcome)):
         raise HTTPException(status_code=400, detail="formula produced non-finite values")
 
     stats = summarise(outcome)
+    sensitivity = sensitivity_ranking(variables, outcome)
 
-    # Stride-sample down to the wire cap for a clean-looking histogram
     if outcome.size > _WIRE_CAP:
         stride = max(1, outcome.size // _WIRE_CAP)
         wire_samples = outcome[::stride][:_WIRE_CAP].tolist()
@@ -67,4 +88,5 @@ def run(cfg: MCConfigIn) -> dict:
         "samples": wire_samples,
         "stats": stats,
         "iterations": cfg.iterations,
+        "sensitivity": sensitivity,
     }

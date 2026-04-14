@@ -347,6 +347,40 @@ export function SimulationPanel({
             <BigStat label="P50" value={fmt(result.stats.p50)} accent />
             <BigStat label="P95" value={fmt(result.stats.p95)} />
           </div>
+
+          {/* Sensitivity — what drives the variance */}
+          {result.sensitivity && result.sensitivity.length > 0 && (
+            <div className="border-t border-paper-rule pt-6">
+              <div className="mb-4 flex items-baseline justify-between">
+                <div className="eyebrow">Sensitivity</div>
+                <span className="meta italic">first-order rank-correlation²</span>
+              </div>
+              <div className="space-y-3">
+                {result.sensitivity.map((row) => {
+                  const pct = row.normalised * 100;
+                  return (
+                    <div key={row.name} className="grid grid-cols-[140px_1fr_60px] items-center gap-4">
+                      <div className="font-display italic text-[15px] text-ink" style={{ fontVariationSettings: '"opsz" 18, "wght" 380' }}>
+                        {row.name}
+                      </div>
+                      <div className="h-2 bg-paper-rule">
+                        <div
+                          className="h-full transition-all"
+                          style={{
+                            width: `${pct}%`,
+                            background: "var(--sec-mc)"
+                          }}
+                        />
+                      </div>
+                      <div className="text-right font-mono text-[12px] tabular-nums text-ink-dim">
+                        {pct.toFixed(1)}%
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
