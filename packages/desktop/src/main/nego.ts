@@ -40,9 +40,22 @@ export class NegoClient {
   debrief(sessionId: string) {
     return this.req<Record<string, unknown>>(`/nego/debrief/${sessionId}`);
   }
+  configure(apiKey: string | null) {
+    return this.req<{ driver: string | null }>("/nego/configure", {
+      method: "POST",
+      body: JSON.stringify({ apiKey })
+    });
+  }
+  nhealth() {
+    return this.req<{ driver: string | null }>("/nego/health");
+  }
 }
 
 let client: NegoClient | null = null;
+
+export function getNegoClient(): NegoClient | null {
+  return client;
+}
 
 export function registerNegoIpc(baseUrl: string): void {
   client = new NegoClient(baseUrl);

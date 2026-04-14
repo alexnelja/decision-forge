@@ -4,7 +4,7 @@ import { startSidecar, defaultEnginePaths, Sidecar } from "./sidecar.js";
 import { registerScenarioIpc } from "./scenarios.js";
 import { registerForecastIpc } from "./forecast.js";
 import { registerMcIpc } from "./mc.js";
-import { registerNegoIpc } from "./nego.js";
+import { registerNegoIpc, getNegoClient } from "./nego.js";
 import {
   getAnthropicKey,
   setAnthropicKey,
@@ -50,10 +50,34 @@ app.whenReady().then(async () => {
   registerMcIpc(sidecar.baseUrl);
   registerNegoIpc(sidecar.baseUrl);
 
-  // Keychain IPC
+  // If we have a key already, push it to the sidecar so the driver is live even
+  // when the env var didn't propagate cleanly.
+  if (anthropicKey) {
+    try {
+      await getNegoClient()!.configure(anthropicKey);
+    } catch (err) {
+      console.warn("failed to configure sidecar with keychain key:", err);
+    }
+  }
+
+  // Keychain IPC — setting also hot-configures the sidecar
   ipcMain.handle("keychain:get", () => getAnthropicKey());
-  ipcMain.handle("keychain:set", (_e, key) => setAnthropicKey(key));
-  ipcMain.handle("keychain:clear", () => clearAnthropicKey());
+  ipcMain.handle("keychain:set", async (_e, key: string) => {
+    await setAnthropicKey(key);
+    try {
+      await getNegoClient()?.configure(key);
+    } catch (err) {
+      console.warn("failed to hot-configure sidecar:", err);
+    }
+  });
+  ipcMain.handle("keychain:clear", async () => {
+    await clearAnthropicKey();
+    try {
+      await getNegoClient()?.configure(null);
+    } catch {
+      // ignore
+    }
+  });
   ipcMain.handle("keychain:has", () => hasAnthropicKey());
 
   ipcMain.handle("sidecar:url", () => sidecar?.baseUrl ?? "");

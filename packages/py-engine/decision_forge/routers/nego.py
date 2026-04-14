@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
+from decision_forge.nego.agent import AnthropicDriver
 from decision_forge.nego.session import SessionStore, make_store
 
 
@@ -34,6 +35,31 @@ class StartRequest(BaseModel):
 
 class ActionRequest(BaseModel):
     action: dict[str, Any] = Field(description="NegoAction-shaped payload")
+
+
+class ConfigureRequest(BaseModel):
+    apiKey: str | None = None
+
+
+@router.post("/configure")
+def configure(body: ConfigureRequest) -> dict:
+    """Hot-swap the Anthropic driver at runtime. Used when the user sets the
+    API key via the keychain AFTER the sidecar has already been spawned."""
+    store = _default_store()
+    if body.apiKey and body.apiKey.strip():
+        try:
+            store.driver = AnthropicDriver(api_key=body.apiKey.strip())
+        except Exception as exc:
+            raise HTTPException(400, f"driver init failed: {exc}")
+        return {"driver": "anthropic"}
+    store.driver = None
+    return {"driver": None}
+
+
+@router.get("/health")
+def nego_health() -> dict:
+    store = _default_store()
+    return {"driver": "anthropic" if store.driver else None}
 
 
 @router.post("/start")
