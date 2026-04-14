@@ -9,12 +9,13 @@ Plan 1 (current): `../docs/superpowers/plans/2026-04-13-decision-forge-plan-1-fo
 
 ## Status
 
-**Plan 1 — Foundation.** Monorepo skeleton, Electron shell, and Python sidecar supervisor are in place. Feature modules (Forecast Journal, Monte Carlo, Negotiation Dojo) are stubs pending Plans 2–4.
+**Plan 2 — Forecast Journal complete (2026-04-14).** Working calibration journal: ask questions with probabilities, log predictions, resolve outcomes, view overall Brier score and 10-bucket reliability plot. SQLite at `~/DecisionForge/forecasts.db`, Python sidecar computes calibration math, Electron bridges IPC → REST. Monte Carlo (Plan 3) and Negotiation Dojo (Plan 4) remain stubs.
 
 What exists in `packages/`:
-- **`core/`** — shared TS library. Zod schemas (`scenario`, `mc-config`, `nego-config`, `forecast` — last three are placeholders), path helpers (`paths.ts`), vitest suite.
-- **`desktop/`** — Electron app. Main process (`index.ts`, `preload.ts`, `sidecar.ts` supervisor, `scenarios.ts`, `keychain.ts` stub), React renderer (Vite + Tailwind + framer-motion) with page stubs for each module.
-- **`py-engine/`** — FastAPI sidecar (`app.py`, `main.py`, `config.py`, `routers/health.py`) with `/health` endpoint and pytest setup.
+- **`core/`** — shared TS library. Zod schemas (`scenario`, `forecast` — full; `mc-config`, `nego-config` placeholders), path helpers, vitest suite.
+- **`desktop/`** — Electron app. Main process (`index.ts`, `preload.ts`, `sidecar.ts` supervisor, `scenarios.ts`, `forecast.ts` IPC, `keychain.ts` stub), React renderer (Vite + Tailwind + framer-motion) with working Forecast page (AskForm, QuestionList, ResolveDialog, Calibration, SeedButton) and stubs for Monte Carlo / Negotiation.
+- **`py-engine/`** — FastAPI sidecar with `/health` and `/forecast` routers, SQLite persistence (`db.py`), calibration math (`calibration.py`), pytest.
+- **`cli/`** — CLI stub with version command.
 
 ## Setup & Run
 
