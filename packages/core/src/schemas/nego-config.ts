@@ -112,6 +112,7 @@ export type NegoTranscriptEntry = z.infer<typeof NegoTranscriptEntrySchema>;
 export const NegoSessionStateSchema = z.object({
   id: z.string(),
   config: NegoConfigSchema,
+  mcSamples: z.record(z.number()).default({}),
   startedAt: z.string(),
   endedAt: z.string().nullable(),
   outcome: z

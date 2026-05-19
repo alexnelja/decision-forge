@@ -3,8 +3,16 @@ import type {
   NegoConfig,
   NegoSeat,
   NegoIssue,
-  NegoPersona
+  NegoPersona,
+  BatnaMCRef
 } from "@decision-forge/core";
+import { BatnaPicker } from "./BatnaPicker";
+import { useLatestMCVariables } from "../../lib/mc-store";
+import { variablePercentile } from "../../lib/mc-percentile";
+
+function isMCRef(v: unknown): v is BatnaMCRef {
+  return typeof v === "object" && v !== null && "refMCVar" in (v as object);
+}
 
 const STYLES: Array<NegoPersona["style"]> = [
   "hardball",
@@ -232,8 +240,25 @@ function IssueRow({
   );
 }
 
-export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
+export function Setup({
+  onLaunch
+}: {
+  onLaunch: (cfg: NegoConfig, mcSamples?: Record<string, number>) => void;
+}) {
   const [config, setConfig] = useState<NegoConfig>(defaultConfig);
+  const mcVariables = useLatestMCVariables();
+
+  function resolveMCSamples(cfg: NegoConfig): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const seat of cfg.seats) {
+      const b = seat.private.batna;
+      if (isMCRef(b)) {
+        const v = mcVariables.find((x) => x.name === b.refMCVar);
+        if (v) out[b.refMCVar] = variablePercentile(v, b.percentile);
+      }
+    }
+    return out;
+  }
 
   function updateIssue(index: number, patch: Partial<NegoIssue>) {
     setConfig((prev) => {
@@ -350,19 +375,13 @@ export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
               style={{ fontVariationSettings: '"opsz" 56, "SOFT" 20, "wght" 360' }}
             />
             <div className="mt-5 space-y-4">
-              <div>
-                <label className="eyebrow mb-1 block">BATNA</label>
-                <input
-                  type="number"
-                  value={buyer.private.batna as number}
-                  onChange={(e) =>
-                    updateSeat(0, {
-                      private: { ...buyer.private, batna: parseFloat(e.target.value) || 0 }
-                    })
-                  }
-                  className="w-full border-0 border-b border-ink-faint bg-transparent pb-1 font-mono text-[16px] tabular-nums text-ink focus:border-ink focus:outline-none"
-                />
-              </div>
+              <BatnaPicker
+                value={buyer.private.batna}
+                onChange={(v) =>
+                  updateSeat(0, { private: { ...buyer.private, batna: v } })
+                }
+              />
+
               <div>
                 <label className="eyebrow mb-1 block">Reservation</label>
                 <input
@@ -556,7 +575,13 @@ export function Setup({ onLaunch }: { onLaunch: (cfg: NegoConfig) => void }) {
       <div className="flex justify-end pt-4">
         <button
           type="button"
-          onClick={() => onLaunch(config)}
+          onClick={() => {
+            const mcSamples = resolveMCSamples(config);
+            onLaunch(
+              config,
+              Object.keys(mcSamples).length > 0 ? mcSamples : undefined
+            );
+          }}
           className="border px-8 py-4 font-display text-[16px] tracking-[0.3em]"
           style={{
             borderColor: "var(--sec-nego)",

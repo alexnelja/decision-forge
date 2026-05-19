@@ -23,7 +23,10 @@ type McApi = {
 };
 
 type NegoApi = {
-  start: (config: unknown) => Promise<unknown>;
+  start: (
+    config: unknown,
+    mcSamples?: Record<string, number>
+  ) => Promise<unknown>;
   list: () => Promise<Array<Record<string, unknown>>>;
   state: (sessionId: string) => Promise<unknown>;
   action: (sessionId: string, action: unknown) => Promise<unknown>;
@@ -56,7 +59,8 @@ const mc: McApi = {
 };
 
 const nego: NegoApi = {
-  start: (config) => ipcRenderer.invoke("nego:start", config),
+  start: (config, mcSamples) =>
+    ipcRenderer.invoke("nego:start", config, mcSamples),
   list: () => ipcRenderer.invoke("nego:list"),
   state: (id) => ipcRenderer.invoke("nego:state", id),
   action: (id, action) => ipcRenderer.invoke("nego:action", id, action),

@@ -27,10 +27,16 @@ export class NegoClient {
     return r.json() as Promise<T>;
   }
 
-  start(config: NegoConfig) {
+  start(config: NegoConfig, mcSamples?: Record<string, number>) {
+    const body: { config: NegoConfig; mc_samples?: Record<string, number> } = {
+      config
+    };
+    if (mcSamples && Object.keys(mcSamples).length > 0) {
+      body.mc_samples = mcSamples;
+    }
     return this.req<NegoSessionState>("/nego/start", {
       method: "POST",
-      body: JSON.stringify({ config })
+      body: JSON.stringify(body)
     });
   }
   listSessions() {
@@ -67,7 +73,9 @@ export function getNegoClient(): NegoClient | null {
 
 export function registerNegoIpc(baseUrl: string): void {
   client = new NegoClient(baseUrl);
-  ipcMain.handle("nego:start", (_e, config) => client!.start(config));
+  ipcMain.handle("nego:start", (_e, config, mcSamples) =>
+    client!.start(config, mcSamples)
+  );
   ipcMain.handle("nego:list", () => client!.listSessions());
   ipcMain.handle("nego:state", (_e, id) => client!.state(id));
   ipcMain.handle("nego:action", (_e, id, action) => client!.action(id, action));

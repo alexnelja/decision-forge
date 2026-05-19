@@ -17,8 +17,11 @@ export default function Negotiation() {
     keychainApi.has().then((has) => setPhase(has ? "setup" : "need-key"));
   }, []);
 
-  async function launch(config: NegoConfig) {
-    const s = await negoApi.start(config);
+  async function launch(
+    config: NegoConfig,
+    mcSamples?: Record<string, number>
+  ) {
+    const s = await negoApi.start(config, mcSamples);
     setSession(s);
     setPhase(s.outcome === "active" ? "active" : "debrief");
     if (s.outcome !== "active") {

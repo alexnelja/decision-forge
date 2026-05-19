@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MCConfig, MCRunResult, MCVariable } from "@decision-forge/core";
 import { ModuleFrame } from "../components/ModuleFrame";
 import { mcApi } from "../lib/mc-api";
+import { setLatestMCVariables } from "../lib/mc-store";
 import { VariableCard } from "./mc/VariableCard";
 import { SimulationPanel } from "./mc/SimulationPanel";
 import { LogForecastButton } from "./mc/LogForecastButton";
@@ -22,6 +23,11 @@ export default function MonteCarlo() {
   const [result, setResult] = useState<MCRunResult | null>(null);
 
   const config: MCConfig = { variables, formula, iterations };
+
+  // Publish variables to the shared store so Negotiation can link a BATNA
+  useEffect(() => {
+    setLatestMCVariables(variables);
+  }, [variables]);
 
   async function handleRun(cfg: MCConfig): Promise<MCRunResult> {
     setFormula(cfg.formula);

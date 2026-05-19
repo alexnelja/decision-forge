@@ -14,7 +14,8 @@ type NegoDebrief = {
 };
 
 export const negoApi = {
-  start: (config: NegoConfig) => window.api.nego.start(config) as Promise<NegoSessionState>,
+  start: (config: NegoConfig, mcSamples?: Record<string, number>) =>
+    window.api.nego.start(config, mcSamples) as Promise<NegoSessionState>,
   list: () => window.api.nego.list(),
   state: (id: string) => window.api.nego.state(id) as Promise<NegoSessionState>,
   action: (id: string, action: NegoAction) =>
