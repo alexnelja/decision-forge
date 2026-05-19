@@ -121,3 +121,52 @@ describe("NegoConfig schema", () => {
     expect(parsed.discountFactor).toBeGreaterThan(0);
   });
 });
+
+describe("refMCVar BATNA branch", () => {
+  const seatWithMCBatna = (batna: unknown) => ({
+    ...humanSeat,
+    private: { ...humanSeat.private, batna }
+  });
+
+  it("accepts a bare {refMCVar} and defaults percentile to 50", () => {
+    const parsed = NegoSeatSchema.parse(seatWithMCBatna({ refMCVar: "price" }));
+    expect(parsed.private.batna).toEqual({ refMCVar: "price", percentile: 50 });
+  });
+
+  it("accepts {refMCVar, percentile} with an explicit percentile", () => {
+    const parsed = NegoSeatSchema.parse(
+      seatWithMCBatna({ refMCVar: "price", percentile: 90 })
+    );
+    expect(parsed.private.batna).toEqual({ refMCVar: "price", percentile: 90 });
+  });
+
+  it("rejects refMCVar with empty name", () => {
+    expect(() =>
+      NegoSeatSchema.parse(seatWithMCBatna({ refMCVar: "", percentile: 50 }))
+    ).toThrow();
+  });
+
+  it("rejects percentile out of [1, 99]", () => {
+    expect(() =>
+      NegoSeatSchema.parse(seatWithMCBatna({ refMCVar: "price", percentile: 0 }))
+    ).toThrow();
+    expect(() =>
+      NegoSeatSchema.parse(
+        seatWithMCBatna({ refMCVar: "price", percentile: 100 })
+      )
+    ).toThrow();
+  });
+
+  it("rejects non-integer percentile", () => {
+    expect(() =>
+      NegoSeatSchema.parse(
+        seatWithMCBatna({ refMCVar: "price", percentile: 50.5 })
+      )
+    ).toThrow();
+  });
+
+  it("still accepts a scalar BATNA", () => {
+    const parsed = NegoSeatSchema.parse(seatWithMCBatna(175));
+    expect(parsed.private.batna).toBe(175);
+  });
+});

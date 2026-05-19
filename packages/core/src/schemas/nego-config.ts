@@ -41,8 +41,14 @@ const UtilityLeafSchema = z.object({
   shape: z.enum(["linear", "concave"]).optional()
 });
 
+export const BatnaMCRefSchema = z.object({
+  refMCVar: z.string().min(1),
+  percentile: z.number().int().min(1).max(99).default(50)
+});
+export type BatnaMCRef = z.infer<typeof BatnaMCRefSchema>;
+
 export const NegoSeatPrivateSchema = z.object({
-  batna: z.union([z.number(), z.object({ refMCVar: z.string().min(1) })]),
+  batna: z.union([z.number(), BatnaMCRefSchema]),
   reservationPrice: z.number(),
   utilityFn: z.array(UtilityLeafSchema).min(1),
   info: z.string().default("")
