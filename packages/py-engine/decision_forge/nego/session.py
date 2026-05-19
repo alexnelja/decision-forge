@@ -31,9 +31,15 @@ def _seat_favor(seat: dict, config: dict) -> str:
 class NegoSession:
     """One active or ended negotiation."""
 
-    def __init__(self, config: dict, session_id: str | None = None):
+    def __init__(
+        self,
+        config: dict,
+        session_id: str | None = None,
+        mc_samples: dict[str, float] | None = None
+    ):
         self.id = session_id or str(uuid.uuid4())
         self.config = config
+        self.mc_samples: dict[str, float] = dict(mc_samples or {})
         self.started_at = _now_iso()
         self.ended_at: str | None = None
         self.outcome = "active"
@@ -114,6 +120,7 @@ class NegoSession:
         return {
             "id": self.id,
             "config": self.config,
+            "mcSamples": self.mc_samples,
             "startedAt": self.started_at,
             "endedAt": self.ended_at,
             "outcome": self.outcome,
@@ -139,7 +146,7 @@ class NegoSession:
             utilities[seat["id"]] = {
                 "label": seat.get("label"),
                 "utility": utility,
-                "batna": batna_value(private)
+                "batna": batna_value(private, self.mc_samples)
             }
 
         # Surplus above BATNA (simple: utility - normalised_batna). For Plan 4 we
@@ -172,8 +179,12 @@ class SessionStore:
         self._live: dict[str, NegoSession] = {}
         self.driver = driver
 
-    def create(self, config: dict) -> NegoSession:
-        session = NegoSession(config)
+    def create(
+        self,
+        config: dict,
+        mc_samples: dict[str, float] | None = None
+    ) -> NegoSession:
+        session = NegoSession(config, mc_samples=mc_samples)
         self._live[session.id] = session
         self._write(session)
         return session
@@ -186,7 +197,11 @@ class SessionStore:
             return None
         data = json.loads(path.read_text())
         # Rehydrate minimally — we don't need full history replay; we rebuild.
-        session = NegoSession(data["config"], session_id=data["id"])
+        session = NegoSession(
+            data["config"],
+            session_id=data["id"],
+            mc_samples=data.get("mcSamples") or {}
+        )
         session.started_at = data["startedAt"]
         session.ended_at = data.get("endedAt")
         session.outcome = data.get("outcome", "active")
@@ -235,7 +250,13 @@ class SessionStore:
             if self.driver is None:
                 break
             model = (seat.get("persona") or {}).get("model", "claude-sonnet-4-6")
-            action = self.driver.decide(seat, session.config, session.transcript, model)
+            action = self.driver.decide(
+                seat,
+                session.config,
+                session.transcript,
+                model,
+                mc_samples=session.mc_samples
+            )
             session.apply(action)
             self._write(session)
             turns += 1

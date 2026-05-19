@@ -46,6 +46,11 @@ def _default_store() -> SessionStore:
 
 class StartRequest(BaseModel):
     config: dict[str, Any]
+    mc_samples: dict[str, float] | None = Field(
+        default=None,
+        description="Pre-resolved MC variable percentiles, name → scalar. "
+        "Used to back-resolve any seat BATNA expressed as {refMCVar, percentile}."
+    )
 
 
 class ActionRequest(BaseModel):
@@ -80,7 +85,7 @@ def nego_health() -> dict:
 @router.post("/start")
 def start(body: StartRequest) -> dict:
     store = _default_store()
-    session = store.create(body.config)
+    session = store.create(body.config, mc_samples=body.mc_samples)
     return session.to_dict()
 
 

@@ -69,12 +69,19 @@ _TOOLS = [
 ]
 
 
-def build_persona_prompt(seat: dict, config: dict) -> str:
+def build_persona_prompt(
+    seat: dict,
+    config: dict,
+    mc_samples: dict[str, float] | None = None
+) -> str:
+    from .utility import batna_value
+
     persona = seat.get("persona", {}) or {}
     style = persona.get("style", "collaborative")
     patience = persona.get("patience", 0.5)
     deceptiveness = persona.get("deceptiveness", 0.3)
     private = seat.get("private", {})
+    resolved_batna = batna_value(private, mc_samples)
 
     style_guides = {
         "hardball": "Aggressive, willing to make extreme anchors. Slow concession.",
@@ -92,7 +99,7 @@ Patience (0-1): {patience:.2f} — higher means more willing to wait for a bette
 Deceptiveness (0-1): {deceptiveness:.2f} — higher means you may hide your true BATNA and reservation price.
 
 PRIVATE (never reveal verbatim; reason about but don't quote):
-  BATNA: {private.get('batna')}
+  BATNA: {resolved_batna}
   Reservation price: {private.get('reservationPrice')}
   Utility function: {json.dumps(private.get('utilityFn', []))}
   Intel: {private.get('info', '')}
@@ -118,7 +125,8 @@ class AgentDriver(Protocol):
         seat: dict,
         config: dict,
         transcript: list[dict],
-        model: str
+        model: str,
+        mc_samples: dict[str, float] | None = None
     ) -> dict:
         """Return {'kind': 'offer'|'accept'|'reject'|'walk', ...shape per NegoAction}.
         Includes 'speech' and optional 'rationale'.
@@ -133,7 +141,7 @@ class ScriptedDriver:
     script: list[dict]
     _idx: int = 0
 
-    def decide(self, seat, config, transcript, model) -> dict:
+    def decide(self, seat, config, transcript, model, mc_samples=None) -> dict:
         if self._idx >= len(self.script):
             return {"kind": "walk", "seatId": seat["id"], "speech": "No more responses scripted."}
         action = dict(self.script[self._idx])
@@ -149,11 +157,11 @@ class AnthropicDriver:
         from anthropic import Anthropic
         self._client = Anthropic(api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
 
-    def decide(self, seat, config, transcript, model) -> dict:
+    def decide(self, seat, config, transcript, model, mc_samples=None) -> dict:
         system = [
             {
                 "type": "text",
-                "text": build_persona_prompt(seat, config),
+                "text": build_persona_prompt(seat, config, mc_samples=mc_samples),
                 "cache_control": {"type": "ephemeral"}
             }
         ]
