@@ -2,16 +2,16 @@
 
 Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`.
 
-## Plan 1 — Foundation (current)
+## Plan 1 — Foundation ✅ complete (2026-04-14)
 
 - [x] pnpm + turbo monorepo skeleton
 - [x] `@decision-forge/core` with Scenario Zod schema and path helpers
 - [x] FastAPI sidecar (`py-engine`) with `/health`
 - [x] Electron main + sidecar supervisor (spawn, health-wait, shutdown)
-- [ ] Renderer shell with module frames (Monte Carlo / Negotiation / Forecast stubs)
-- [ ] Keychain stub (`keytar`) — real wiring in Plan 4
-- [ ] Scenario JSON persistence under `~/DecisionForge/`
-- [ ] Plan 1 Definition-of-Done checklist complete
+- [x] Renderer shell with module frames — `Masthead`, `ModuleFrame`, `Sidecar` + Home/Forecast/MC/Negotiation pages
+- [x] Keychain stub (`keytar`) in `main/keychain.ts` — real wiring landed in Plan 4
+- [x] Scenario JSON persistence under `~/DecisionForge/` — `main/scenarios.ts` + e2e in `tests/e2e/scenarios.spec.ts`
+- [x] Plan 1 Definition-of-Done checklist complete
 
 ## Plan 2 — Forecast Journal ✅ complete (2026-04-14)
 
@@ -35,13 +35,14 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [x] Playwright e2e: run → log P90 → appears in Forecast journal
 
 ### Plan 3.5 status (partially complete 2026-04-14)
+
 - [x] PERT + empirical sampling (py-engine and renderer preview)
 - [x] Variable correlations (Iman-Conover rank-reordering preserving marginals)
 - [x] First-order sensitivity ranking (Spearman² bars)
+- [x] Compare mode — keep-as-baseline snapshot, dual-distribution histogram on shared x-range, signed delta indicators (citron up / vermilion down) under each summary stat (`971c0c6`)
 - [ ] 3D particle cloud (react-three-fiber) — deferred
 - [ ] SSE streaming of run progress — deferred (polling sufficient for <200ms runs)
 - [ ] Sobol total-order indices (SAlib) — deferred
-- [ ] Compare mode (two scenarios overlaid) — deferred
 
 ## Plan 4 — Negotiation Dojo ✅ complete (2026-04-14)
 
@@ -53,18 +54,20 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [x] Theater-script UI: KeyPrompt, Setup (Act I-III), SessionView, Debrief
 - [x] Per-seat utility, BATNA reference, Nash equal-gain target
 
-### Deferred to Plan 4.5
-- 3D negotiation table (react-three-fiber)
-- SSE streaming of agent turns (polling works for now)
-- Multi-issue offers with per-issue sliders
-- MC variable → BATNA linkage (`{refMCVar}`) fully wired
-- Thought-bubble reasoning trace
-- Timeline scrubber / replay
+### Plan 4.5 status (partially complete 2026-04-14)
+
+- [x] Multi-issue offers with per-issue sliders — continuous + discrete issues, add/remove with weight rebalancing, full terms map in offers (`971c0c6`)
+- [x] Timeline scrubber / replay — Play/Pause/Rewind/End, cursor-synced ZOPA dot, transcript dimming past cursor in Debrief (`971c0c6`)
+- [x] Nego E2E via `ScriptedDriver` — `DECISION_FORGE_NEGO_SCRIPT` env makes sidecar deterministic regardless of Anthropic key; `tests/e2e/nego.spec.ts` covers key-prompt → BEGIN → offer → accept → handshake → scrubber (`971c0c6`)
+- [ ] MC variable → BATNA linkage (`{refMCVar}`) fully wired — deferred
+- [ ] Thought-bubble reasoning trace — deferred
+- [ ] 3D negotiation table (react-three-fiber) — deferred
+- [ ] SSE streaming of agent turns — deferred (polling works for now)
 
 ## Cross-cutting / Later
 
-- [ ] Cross-module integration (link forecasts to MC runs, etc.)
+- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 5 specs: smoke, forecast, mc, nego, scenarios
+- [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I. Reverse direction (forecast → MC param distribution) and MC → BATNA (`{refMCVar}` in Nego) still open
 - [ ] Visual/interaction polish per design §10
 - [ ] Packaging, code-signing, auto-update
-- [ ] CLI package (stub referenced in plan, not yet scaffolded)
-- [ ] E2E tests with Playwright (`packages/desktop/test:e2e`)
+- [ ] CLI package (stub at `packages/cli/`, 2 tests, commands not built)
