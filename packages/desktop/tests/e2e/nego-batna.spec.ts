@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from "@playwright/test";
 import path from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
+import { e2eEnv } from "./_env";
 
 /**
  * Plan 4.5 — MC → BATNA linkage e2e.
@@ -13,32 +14,19 @@ import os from "node:os";
  *      persists it on the session.
  *   4. Submit one offer → ScriptedDriver accepts → Debrief renders the
  *      resolved BATNA scalar on the buyer's row.
- *
- * NOTE: skipped today because of a pre-existing esbuild bundle bug —
- * `dist/main/index.js` throws "Cannot read properties of undefined
- * (reading 'whenReady')" before any test code runs. The bundler is
- * collapsing multiple `from "electron"` imports such that the synthesised
- * `import_electron5` ends up undefined at runtime. Affects every e2e
- * spec, not just this one. Unblock by either:
- *   - moving electron imports into a single `electron.ts` re-export, or
- *   - switching the main bundle to ESM (`--format=esm`) so each import
- *     keeps its own require binding.
- * Once unblocked, drop the `.skip`.
  */
-test.skip("MC → BATNA: link buyer BATNA to MC variable at P90 and verify session carries the scalar", async () => {
+test("MC → BATNA: link buyer BATNA to MC variable at P90 and verify session carries the scalar", async () => {
   const tmpHome = mkdtempSync(path.join(os.tmpdir(), "df-nego-batna-"));
 
   const script = JSON.stringify([{ kind: "accept", speech: "Done." }]);
 
   const app = await electron.launch({
     args: [path.resolve(__dirname, "../../dist/main/index.js")],
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
+    env: e2eEnv({
       HOME: tmpHome,
       DECISION_FORGE_NEGO_DIR: path.join(tmpHome, "nego"),
       DECISION_FORGE_NEGO_SCRIPT: script
-    }
+    })
   });
 
   try {

@@ -2,16 +2,14 @@ import { test, expect, _electron as electron } from "@playwright/test";
 import path from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
+import { e2eEnv } from "./_env";
 
 test("scenario save → list → load roundtrip via window.api", async () => {
   const tmpHome = mkdtempSync(path.join(os.tmpdir(), "df-e2e-"));
   const app = await electron.launch({
     args: [path.resolve(__dirname, "../../dist/main/index.js")],
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      HOME: tmpHome // scenariosDir() resolves to $HOME/DecisionForge/scenarios
-    }
+    // scenariosDir() resolves to $HOME/DecisionForge/scenarios
+    env: e2eEnv({ HOME: tmpHome })
   });
   try {
     const window = await app.firstWindow();

@@ -2,6 +2,7 @@ import { test, expect, _electron as electron } from "@playwright/test";
 import path from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
+import { e2eEnv } from "./_env";
 
 /**
  * End-to-end with a scripted driver (no Anthropic calls, no API key needed).
@@ -17,13 +18,11 @@ test("Nego Dojo full flow (scripted): key prompt → setup → offer → AI acce
 
   const app = await electron.launch({
     args: [path.resolve(__dirname, "../../dist/main/index.js")],
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
+    env: e2eEnv({
       HOME: tmpHome,
       DECISION_FORGE_NEGO_DIR: path.join(tmpHome, "nego"),
       DECISION_FORGE_NEGO_SCRIPT: script
-    }
+    })
   });
 
   try {

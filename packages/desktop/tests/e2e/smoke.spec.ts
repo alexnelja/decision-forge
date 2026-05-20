@@ -1,10 +1,11 @@
 import { test, expect, _electron as electron } from "@playwright/test";
 import path from "node:path";
+import { e2eEnv } from "./_env";
 
 test("boots app, sidecar is healthy, all module pages render", async () => {
   const app = await electron.launch({
     args: [path.resolve(__dirname, "../../dist/main/index.js")],
-    env: { ...process.env, NODE_ENV: "test" }
+    env: e2eEnv()
   });
   const window = await app.firstWindow();
   await window.waitForLoadState("domcontentloaded");

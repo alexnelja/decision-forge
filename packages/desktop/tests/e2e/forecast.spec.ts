@@ -2,18 +2,14 @@ import { test, expect, _electron as electron } from "@playwright/test";
 import path from "node:path";
 import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
+import { e2eEnv } from "./_env";
 
 test("ask → resolve → calibration roundtrip via the UI", async () => {
   const tmpHome = mkdtempSync(path.join(os.tmpdir(), "df-forecast-e2e-"));
   const dbPath = path.join(tmpHome, "forecasts.db");
   const app = await electron.launch({
     args: [path.resolve(__dirname, "../../dist/main/index.js")],
-    env: {
-      ...process.env,
-      NODE_ENV: "test",
-      HOME: tmpHome,
-      DECISION_FORGE_DB_PATH: dbPath
-    }
+    env: e2eEnv({ HOME: tmpHome, DECISION_FORGE_DB_PATH: dbPath })
   });
   try {
     const window = await app.firstWindow();
