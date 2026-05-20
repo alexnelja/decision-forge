@@ -33,8 +33,8 @@ test("MC run → log P90 → appears in Forecast journal", async () => {
     // Commit the popover.
     await window.getByRole("button", { name: /^commit$/i }).click();
 
-    // Toast appears; popover closes.
-    await expect(window.getByText(/logged to § iii/i)).toBeVisible();
+    // Confirmation stamp appears ("Logged → § III Forecast"); popover closes.
+    await expect(window.getByText("Logged", { exact: true })).toBeVisible();
 
     // Navigate to § III — Forecast and verify the question landed.
     await window.getByRole("link", { name: /forecast/i }).first().click();
