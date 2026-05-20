@@ -11,6 +11,11 @@ from __future__ import annotations
 
 import os
 import sys
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+load_dotenv(Path(__file__).resolve().parent.parent / ".env", override=False)
 
 from decision_forge.nego.agent import GeminiDriver
 
