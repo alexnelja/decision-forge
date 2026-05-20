@@ -235,7 +235,11 @@ class GeminiDriver:
             contents=user_msg,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
-                max_output_tokens=1024,
+                # gemini-2.5-pro is a thinking model — thinking tokens count
+                # against this budget. 1024 gets fully consumed by thinking on
+                # richer persona prompts, hitting MAX_TOKENS before the function
+                # call is emitted. 8192 leaves ample room for thinking + the call.
+                max_output_tokens=8192,
                 tools=[types.Tool(function_declarations=build_function_declarations(config))],
                 tool_config=types.ToolConfig(
                     function_calling_config=types.FunctionCallingConfig(
