@@ -67,7 +67,7 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 ## Cross-cutting / Later
 
 - [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 5 specs: smoke, forecast, mc, nego, scenarios
-- [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I. Reverse direction (forecast → MC param distribution) and MC → BATNA (`{refMCVar}` in Nego) still open
+- [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I; MC → BATNA (`{refMCVar, percentile}` in Nego) shipped (Plan 4.5). Reverse direction (forecast → MC param distribution) still open
 - [ ] Visual/interaction polish per design §10
 - [ ] Packaging, code-signing, auto-update
 - [ ] CLI package (stub at `packages/cli/`, 2 tests, commands not built)
