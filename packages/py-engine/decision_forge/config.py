@@ -9,7 +9,7 @@ def _default_db() -> str:
 
 class Settings(BaseSettings):
     port: int = 8765
-    anthropic_api_key: str | None = None
+    gemini_api_key: str | None = None
     db_path: str = _default_db()
 
     class Config:

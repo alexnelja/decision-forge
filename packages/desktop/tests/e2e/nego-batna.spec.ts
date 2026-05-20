@@ -25,7 +25,8 @@ test("MC → BATNA: link buyer BATNA to MC variable at P90 and verify session ca
     env: e2eEnv({
       HOME: tmpHome,
       DECISION_FORGE_NEGO_DIR: path.join(tmpHome, "nego"),
-      DECISION_FORGE_NEGO_SCRIPT: script
+      DECISION_FORGE_NEGO_SCRIPT: script,
+      DECISION_FORGE_FAKE_KEYCHAIN: "AIza-dummy-for-e2e"
     })
   });
 
@@ -33,26 +34,18 @@ test("MC → BATNA: link buyer BATNA to MC variable at P90 and verify session ca
     const window = await app.firstWindow();
     await window.waitForLoadState("domcontentloaded");
 
-    // 1. Open Monte Carlo — defaults define a "revenue" variable.
+    // 1. Open Monte Carlo — mounting publishes the default variables
+    // (incl. "revenue") to mc-store via setLatestMCVariables.
     await window.getByRole("link", { name: /monte carlo/i }).first().click();
     await expect(
       window.getByRole("heading", { name: /monte carlo/i })
     ).toBeVisible();
-    // Touch the first variable to ensure mc-store has the defaults
-    // (setLatestMCVariables fires on every state change including mount).
-    await expect(window.getByDisplayValue("revenue")).toBeVisible();
 
-    // 2. Open Negotiation, navigate past key prompt if present
+    // 2. Open Negotiation — key gate pre-satisfied via DECISION_FORGE_FAKE_KEYCHAIN
     await window.getByRole("link", { name: /negotiation/i }).first().click();
     await expect(
       window.getByRole("heading", { name: /negotiation dojo/i })
     ).toBeVisible();
-
-    const keyField = window.locator("#anthropic-key");
-    if (await keyField.isVisible().catch(() => false)) {
-      await keyField.fill("sk-ant-dummy-for-e2e");
-      await window.getByRole("button", { name: /raise curtain/i }).click();
-    }
 
     // 3. Link the buyer BATNA to MC
     await window.getByRole("button", { name: /link to mc/i }).click();
@@ -77,9 +70,9 @@ test("MC → BATNA: link buyer BATNA to MC variable at P90 and verify session ca
 
     // The buyer's row should now show a resolved BATNA in the debrief
     // (any non-zero number, since the percentile is computed from the
-    // sampled distribution). Just assert the row label and value field
-    // exist; the scrubber covers the rest of the path.
-    await expect(window.getByText(/Buyer/)).toBeVisible();
+    // sampled distribution). Just assert the row label exists; the
+    // scrubber covers the rest of the path.
+    await expect(window.getByText(/Buyer/).first()).toBeVisible();
   } finally {
     await app.close();
     rmSync(tmpHome, { recursive: true, force: true });

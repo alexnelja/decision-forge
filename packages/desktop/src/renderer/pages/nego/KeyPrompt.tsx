@@ -41,22 +41,22 @@ export function KeyPrompt({ onReady }: { onReady: () => void }) {
         className="mt-5 font-display text-[17px] leading-[1.55] text-ink-dim"
         style={{ fontVariationSettings: '"opsz" 18, "wght" 360' }}
       >
-        Paste an Anthropic API key to populate the room with negotiators. It is
-        stored in the macOS keychain — never the filesystem, never a scenario
+        Paste a Google Gemini API key to populate the room with negotiators. It
+        is stored in the macOS keychain — never the filesystem, never a scenario
         file, never the transcript. The Python sidecar receives it only at
         launch time, via an environment variable.
       </p>
 
       <div className="mt-8 border-b border-ink-faint pb-2">
-        <label htmlFor="anthropic-key" className="eyebrow mb-2 block">
-          sk-ant-…
+        <label htmlFor="gemini-key" className="eyebrow mb-2 block">
+          AIza…
         </label>
         <input
-          id="anthropic-key"
+          id="gemini-key"
           type="password"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder="sk-ant-api03-…"
+          placeholder="AIzaSy…"
           className="w-full border-0 bg-transparent px-0 font-mono text-[14px] text-ink placeholder:text-ink-faint focus:outline-none"
           onKeyDown={(e) => {
             if (e.key === "Enter") save();

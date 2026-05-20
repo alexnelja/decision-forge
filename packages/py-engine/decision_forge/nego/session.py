@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from .agent import AgentDriver, AnthropicDriver, ScriptedDriver
+from .agent import AgentDriver, GeminiDriver, ScriptedDriver
 from .utility import batna_value, normalise_terms, seat_utility
 
 
@@ -249,7 +249,7 @@ class SessionStore:
                 break
             if self.driver is None:
                 break
-            model = (seat.get("persona") or {}).get("model", "claude-sonnet-4-6")
+            model = (seat.get("persona") or {}).get("model", "gemini-2.5-pro")
             action = self.driver.decide(
                 seat,
                 session.config,
@@ -266,10 +266,10 @@ class SessionStore:
         path.write_text(json.dumps(session.to_dict(), indent=2))
 
 
-def make_store(base_dir: str, anthropic_key: str | None = None) -> SessionStore:
+def make_store(base_dir: str, gemini_key: str | None = None) -> SessionStore:
     driver: AgentDriver | None
-    if anthropic_key:
-        driver = AnthropicDriver(api_key=anthropic_key)
+    if gemini_key:
+        driver = GeminiDriver(api_key=gemini_key)
     else:
         driver = None
     return SessionStore(base_dir, driver=driver)

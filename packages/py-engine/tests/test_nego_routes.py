@@ -43,7 +43,7 @@ def _cfg():
                     "style": "hardball",
                     "patience": 0.5,
                     "deceptiveness": 0.3,
-                    "model": "claude-haiku-4-5"
+                    "model": "gemini-2.5-flash"
                 }
             }
         ],

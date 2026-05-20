@@ -58,7 +58,7 @@ function defaultConfig(): NegoConfig {
           style: "collaborative",
           patience: 0.6,
           deceptiveness: 0.2,
-          model: "claude-sonnet-4-6"
+          model: "gemini-2.5-pro"
         }
       }
     ],
@@ -485,7 +485,7 @@ export function Setup({
               <div>
                 <label className="eyebrow mb-1 block">Model</label>
                 <select
-                  value={supplier.persona?.model ?? "claude-sonnet-4-6"}
+                  value={supplier.persona?.model ?? "gemini-2.5-pro"}
                   onChange={(e) =>
                     updateSeat(1, {
                       persona: {
@@ -496,8 +496,8 @@ export function Setup({
                   }
                   className="w-full border-0 border-b border-ink-faint bg-transparent pb-1 font-mono text-[12px] text-ink focus:border-ink focus:outline-none"
                 >
-                  <option value="claude-sonnet-4-6">claude-sonnet-4-6</option>
-                  <option value="claude-haiku-4-5">claude-haiku-4-5 (cheap)</option>
+                  <option value="gemini-2.5-pro">gemini-2.5-pro</option>
+                  <option value="gemini-2.5-flash">gemini-2.5-flash (cheap)</option>
                 </select>
               </div>
             </div>

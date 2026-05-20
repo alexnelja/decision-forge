@@ -34,7 +34,7 @@ const aiSeat = {
     style: "collaborative" as const,
     patience: 0.7,
     deceptiveness: 0.2,
-    model: "claude-sonnet-4-6" as const
+    model: "gemini-2.5-pro" as const
   }
 };
 

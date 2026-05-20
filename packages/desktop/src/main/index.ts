@@ -6,10 +6,10 @@ import { registerForecastIpc } from "./forecast.js";
 import { registerMcIpc } from "./mc.js";
 import { registerNegoIpc, getNegoClient } from "./nego.js";
 import {
-  getAnthropicKey,
-  setAnthropicKey,
-  clearAnthropicKey,
-  hasAnthropicKey
+  getGeminiKey,
+  setGeminiKey,
+  clearGeminiKey,
+  hasGeminiKey
 } from "./keychain.js";
 
 const PORT = 8765;
@@ -39,10 +39,10 @@ app.whenReady().then(async () => {
   const repoRoot = path.resolve(__dirname, "../../../..");
   const { engineDir, pythonExecutable } = defaultEnginePaths(repoRoot);
 
-  // Pass Anthropic key into the sidecar env at spawn time so /nego/* can call the real API
-  const anthropicKey = await getAnthropicKey();
+  // Pass Gemini key into the sidecar env at spawn time so /nego/* can call the real API
+  const geminiKey = await getGeminiKey();
   const extraEnv: Record<string, string> = {};
-  if (anthropicKey) extraEnv.ANTHROPIC_API_KEY = anthropicKey;
+  if (geminiKey) extraEnv.GEMINI_API_KEY = geminiKey;
 
   sidecar = await startSidecar({ engineDir, pythonExecutable, port: PORT, env: extraEnv });
   registerScenarioIpc();
@@ -52,18 +52,18 @@ app.whenReady().then(async () => {
 
   // If we have a key already, push it to the sidecar so the driver is live even
   // when the env var didn't propagate cleanly.
-  if (anthropicKey) {
+  if (geminiKey) {
     try {
-      await getNegoClient()!.configure(anthropicKey);
+      await getNegoClient()!.configure(geminiKey);
     } catch (err) {
       console.warn("failed to configure sidecar with keychain key:", err);
     }
   }
 
   // Keychain IPC — setting also hot-configures the sidecar
-  ipcMain.handle("keychain:get", () => getAnthropicKey());
+  ipcMain.handle("keychain:get", () => getGeminiKey());
   ipcMain.handle("keychain:set", async (_e, key: string) => {
-    await setAnthropicKey(key);
+    await setGeminiKey(key);
     try {
       await getNegoClient()?.configure(key);
     } catch (err) {
@@ -71,14 +71,14 @@ app.whenReady().then(async () => {
     }
   });
   ipcMain.handle("keychain:clear", async () => {
-    await clearAnthropicKey();
+    await clearGeminiKey();
     try {
       await getNegoClient()?.configure(null);
     } catch {
       // ignore
     }
   });
-  ipcMain.handle("keychain:has", () => hasAnthropicKey());
+  ipcMain.handle("keychain:has", () => hasGeminiKey());
 
   ipcMain.handle("sidecar:url", () => sidecar?.baseUrl ?? "");
   await createWindow();

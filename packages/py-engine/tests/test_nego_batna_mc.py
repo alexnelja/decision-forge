@@ -48,7 +48,7 @@ def _ai_seat(batna):
             "style": "analytical",
             "patience": 0.7,
             "deceptiveness": 0.2,
-            "model": "claude-haiku-4-5"
+            "model": "gemini-2.5-flash"
         }
     }
 

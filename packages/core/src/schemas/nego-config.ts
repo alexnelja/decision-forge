@@ -30,7 +30,7 @@ export const NegoPersonaSchema = z.object({
   style: NegoPersonaStyleSchema,
   patience: z.number().min(0).max(1),
   deceptiveness: z.number().min(0).max(1),
-  model: z.enum(["claude-sonnet-4-6", "claude-haiku-4-5"]),
+  model: z.enum(["gemini-2.5-pro", "gemini-2.5-flash"]),
   customPrompt: z.string().optional()
 });
 export type NegoPersona = z.infer<typeof NegoPersonaSchema>;

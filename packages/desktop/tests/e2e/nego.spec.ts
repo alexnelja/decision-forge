@@ -5,7 +5,7 @@ import os from "node:os";
 import { e2eEnv } from "./_env";
 
 /**
- * End-to-end with a scripted driver (no Anthropic calls, no API key needed).
+ * End-to-end with a scripted driver (no Gemini calls, no API key needed).
  * The sidecar reads DECISION_FORGE_NEGO_SCRIPT and feeds the ScriptedDriver
  * the provided actions in order.
  */
@@ -21,7 +21,11 @@ test("Nego Dojo full flow (scripted): key prompt → setup → offer → AI acce
     env: e2eEnv({
       HOME: tmpHome,
       DECISION_FORGE_NEGO_DIR: path.join(tmpHome, "nego"),
-      DECISION_FORGE_NEGO_SCRIPT: script
+      DECISION_FORGE_NEGO_SCRIPT: script,
+      // Fake the keychain so the key gate is satisfied without a real macOS
+      // Keychain write (which blocks on an access prompt headless). The
+      // sidecar uses the ScriptedDriver regardless of this value.
+      DECISION_FORGE_FAKE_KEYCHAIN: "AIza-dummy-for-e2e"
     })
   });
 
@@ -33,15 +37,7 @@ test("Nego Dojo full flow (scripted): key prompt → setup → offer → AI acce
     await window.getByRole("link", { name: /negotiation/i }).first().click();
     await expect(window.getByRole("heading", { name: /negotiation dojo/i })).toBeVisible();
 
-    // Either key prompt appears (no key yet) or setup does. If key prompt shows,
-    // enter any dummy value — the sidecar uses the ScriptedDriver anyway.
-    const keyField = window.locator("#anthropic-key");
-    if (await keyField.isVisible().catch(() => false)) {
-      await keyField.fill("sk-ant-dummy-for-e2e");
-      await window.getByRole("button", { name: /raise curtain/i }).click();
-    }
-
-    // Setup — click BEGIN with defaults
+    // Key gate is pre-satisfied via DECISION_FORGE_FAKE_KEYCHAIN → straight to Setup.
     await window.getByRole("button", { name: /^BEGIN$/ }).click();
 
     // Session view — submit an offer
@@ -53,8 +49,9 @@ test("Nego Dojo full flow (scripted): key prompt → setup → offer → AI acce
       timeout: 5_000
     });
 
-    // Terms should include the offered price_per_ton
-    await expect(window.getByText(/price_per_ton/)).toBeVisible();
+    // Terms should include the offered price_per_ton (appears in both the
+    // deal summary and the replay transcript — match the first).
+    await expect(window.getByText(/price_per_ton/).first()).toBeVisible();
 
     // Replay scrubber is visible
     await expect(window.getByRole("slider", { name: /replay scrubber/i })).toBeVisible();

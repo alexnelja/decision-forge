@@ -37,7 +37,7 @@ def _cfg():
                     "style": "collaborative",
                     "patience": 0.6,
                     "deceptiveness": 0.2,
-                    "model": "claude-haiku-4-5"
+                    "model": "gemini-2.5-flash"
                 }
             }
         ],
