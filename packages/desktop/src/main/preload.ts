@@ -31,6 +31,7 @@ type NegoApi = {
   state: (sessionId: string) => Promise<unknown>;
   action: (sessionId: string, action: unknown) => Promise<unknown>;
   debrief: (sessionId: string) => Promise<unknown>;
+  health: () => Promise<{ driver: string | null }>;
 };
 
 type KeychainApi = {
@@ -64,7 +65,8 @@ const nego: NegoApi = {
   list: () => ipcRenderer.invoke("nego:list"),
   state: (id) => ipcRenderer.invoke("nego:state", id),
   action: (id, action) => ipcRenderer.invoke("nego:action", id, action),
-  debrief: (id) => ipcRenderer.invoke("nego:debrief", id)
+  debrief: (id) => ipcRenderer.invoke("nego:debrief", id),
+  health: () => ipcRenderer.invoke("nego:health")
 };
 
 const keychain: KeychainApi = {

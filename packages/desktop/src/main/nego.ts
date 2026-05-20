@@ -80,4 +80,5 @@ export function registerNegoIpc(baseUrl: string): void {
   ipcMain.handle("nego:state", (_e, id) => client!.state(id));
   ipcMain.handle("nego:action", (_e, id, action) => client!.action(id, action));
   ipcMain.handle("nego:debrief", (_e, id) => client!.debrief(id));
+  ipcMain.handle("nego:health", () => client!.nhealth());
 }

@@ -14,7 +14,16 @@ export default function Negotiation() {
   const [debrief, setDebrief] = useState<NegoDebrief | null>(null);
 
   useEffect(() => {
-    keychainApi.has().then((has) => setPhase(has ? "setup" : "need-key"));
+    // Key gate is satisfied if the keychain has a key OR the sidecar already
+    // has a live driver (e.g. a GEMINI_API_KEY/GOOGLE_API_KEY loaded from
+    // packages/py-engine/.env at startup). The latter means no re-entry.
+    (async () => {
+      const [has, health] = await Promise.all([
+        keychainApi.has(),
+        negoApi.health().catch(() => ({ driver: null as string | null }))
+      ]);
+      setPhase(has || health.driver ? "setup" : "need-key");
+    })();
   }, []);
 
   async function launch(

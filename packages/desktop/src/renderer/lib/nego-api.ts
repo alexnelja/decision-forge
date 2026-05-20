@@ -20,7 +20,9 @@ export const negoApi = {
   state: (id: string) => window.api.nego.state(id) as Promise<NegoSessionState>,
   action: (id: string, action: NegoAction) =>
     window.api.nego.action(id, action) as Promise<NegoSessionState>,
-  debrief: (id: string) => window.api.nego.debrief(id) as Promise<NegoDebrief>
+  debrief: (id: string) => window.api.nego.debrief(id) as Promise<NegoDebrief>,
+  health: () =>
+    window.api.nego.health() as Promise<{ driver: string | null }>
 };
 
 export const keychainApi = {
