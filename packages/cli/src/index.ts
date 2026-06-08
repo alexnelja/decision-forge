@@ -1,23 +1,33 @@
 #!/usr/bin/env node
 import { readFile as fsReadFile } from "node:fs/promises";
-import { MCConfigSchema } from "@decision-forge/core";
+import { randomUUID } from "node:crypto";
+import {
+  MCConfigSchema,
+  QuestionSchema,
+  PredictionSchema,
+  ResolutionSchema
+} from "@decision-forge/core";
 import type { MCConfig, MCRunResult, CalibrationReport } from "@decision-forge/core";
 
 const VERSION = "decision-forge 0.1.0";
 const DEFAULT_SIDECAR_URL = "http://127.0.0.1:8765";
 
-/** Injectable side effects, so commands stay unit-testable without disk or network. */
+/** Injectable side effects, so commands stay unit-testable without disk, network, clock, or RNG. */
 export interface CliDeps {
   readFile: (path: string) => Promise<string>;
   fetchImpl: typeof fetch;
   env: Record<string, string | undefined>;
+  now: () => string;
+  uuid: () => string;
 }
 
 function resolveDeps(deps: Partial<CliDeps>): CliDeps {
   return {
     readFile: deps.readFile ?? ((p) => fsReadFile(p, "utf8")),
     fetchImpl: deps.fetchImpl ?? fetch,
-    env: deps.env ?? process.env
+    env: deps.env ?? process.env,
+    now: deps.now ?? (() => new Date().toISOString()),
+    uuid: deps.uuid ?? (() => randomUUID())
   };
 }
 
@@ -31,31 +41,44 @@ const MC_USAGE = [
 const FORECAST_USAGE = [
   "usage: decision-forge forecast <command> [--url U] [--json]",
   "",
-  "  list          list journal questions and their latest predictions",
-  "  calibration   show the Brier score and reliability buckets"
+  "  list                              list questions and latest predictions",
+  "  calibration                       Brier score and reliability buckets",
+  "  ask <text> --prob P --by DATE [--tags a,b] [--criteria C]",
+  "  resolve <questionId> <true|false> [--notes N]"
 ].join("\n");
 
-/** Parse the flags shared across commands: positionals, --json, --url <value>. */
-function parseFlags(rest: string[]): {
+interface ParsedArgs {
   positionals: string[];
   asJson: boolean;
-  urlFlag?: string;
-} {
+  /** `--json` excluded; every other `--key value` lands here. */
+  options: Record<string, string>;
+}
+
+/** Parse positionals, the boolean --json, and `--key value` options (e.g. --url, --prob, --by). */
+function parseFlags(rest: string[]): ParsedArgs {
   const positionals: string[] = [];
   let asJson = false;
-  let urlFlag: string | undefined;
+  const options: Record<string, string> = {};
   for (let i = 0; i < rest.length; i++) {
     const tok = rest[i];
     if (tok === undefined) continue;
     if (tok === "--json") asJson = true;
-    else if (tok === "--url") urlFlag = rest[++i]; // consume the value, don't treat it as a positional
-    else if (!tok.startsWith("--")) positionals.push(tok);
+    else if (tok.startsWith("--")) options[tok.slice(2)] = rest[++i] ?? ""; // consume the value
+    else positionals.push(tok);
   }
-  return { positionals, asJson, urlFlag };
+  return { positionals, asJson, options };
 }
 
 function resolveUrl(deps: CliDeps, urlFlag?: string): string {
   return urlFlag ?? deps.env.SIDECAR_URL ?? DEFAULT_SIDECAR_URL;
+}
+
+/** Format a Zod failure into a readable, path-annotated error. */
+function zodError(label: string, error: { issues: Array<{ path: Array<string | number>; message: string }> }): Error {
+  const issues = error.issues
+    .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)
+    .join("\n");
+  return new Error(`${label} invalid:\n${issues}`);
 }
 
 /** Read a file and parse it as a Monte Carlo config, throwing readable errors. */
@@ -69,30 +92,8 @@ async function loadConfig(deps: CliDeps, file: string | undefined): Promise<MCCo
     throw new Error(`invalid JSON in ${file}: ${(e as Error).message}`);
   }
   const parsed = MCConfigSchema.safeParse(raw);
-  if (!parsed.success) {
-    const issues = parsed.error.issues
-      .map((i) => `  - ${i.path.join(".") || "(root)"}: ${i.message}`)
-      .join("\n");
-    throw new Error(`config invalid in ${file}:\n${issues}`);
-  }
+  if (!parsed.success) throw zodError(`config in ${file}`, parsed.error);
   return parsed.data;
-}
-
-async function postRun(
-  deps: CliDeps,
-  baseUrl: string,
-  config: MCConfig
-): Promise<MCRunResult> {
-  const res = await deps.fetchImpl(`${baseUrl}/mc/run`, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify(config)
-  });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new Error(`mc/run ${res.status}: ${body.slice(0, 200)}`);
-  }
-  return (await res.json()) as MCRunResult;
 }
 
 async function httpGet<T>(deps: CliDeps, baseUrl: string, path: string): Promise<T> {
@@ -103,6 +104,19 @@ async function httpGet<T>(deps: CliDeps, baseUrl: string, path: string): Promise
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     throw new Error(`GET ${path} ${res.status}: ${body.slice(0, 200)}`);
+  }
+  return (await res.json()) as T;
+}
+
+async function httpPost<T>(deps: CliDeps, baseUrl: string, path: string, payload: unknown): Promise<T> {
+  const res = await deps.fetchImpl(`${baseUrl}${path}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`POST ${path} ${res.status}: ${body.slice(0, 200)}`);
   }
   return (await res.json()) as T;
 }
@@ -157,9 +171,14 @@ async function mcCommand(deps: CliDeps, args: string[]): Promise<string> {
       );
     }
     case "run": {
-      const { positionals, asJson, urlFlag } = parseFlags(rest);
+      const { positionals, asJson, options } = parseFlags(rest);
       const config = await loadConfig(deps, positionals[0]);
-      const result = await postRun(deps, resolveUrl(deps, urlFlag), config);
+      const result = await httpPost<MCRunResult>(
+        deps,
+        resolveUrl(deps, options.url),
+        "/mc/run",
+        config
+      );
       return asJson ? JSON.stringify(result) : formatRunResult(config.formula, result);
     }
     default:
@@ -203,10 +222,17 @@ function formatCalibration(report: CalibrationReport): string {
   return lines.join("\n");
 }
 
+function parseOutcome(raw: string): 0 | 1 {
+  const t = raw.toLowerCase();
+  if (t === "true" || t === "1" || t === "yes" || t === "y") return 1;
+  if (t === "false" || t === "0" || t === "no" || t === "n") return 0;
+  throw new Error(`outcome must be true or false (got "${raw}")`);
+}
+
 async function forecastCommand(deps: CliDeps, args: string[]): Promise<string> {
   const [sub, ...rest] = args;
-  const { asJson, urlFlag } = parseFlags(rest);
-  const baseUrl = resolveUrl(deps, urlFlag);
+  const { positionals, asJson, options } = parseFlags(rest);
+  const baseUrl = resolveUrl(deps, options.url);
   switch (sub) {
     case "list": {
       const questions = await httpGet<Array<Record<string, unknown>>>(
@@ -219,6 +245,62 @@ async function forecastCommand(deps: CliDeps, args: string[]): Promise<string> {
     case "calibration": {
       const report = await httpGet<CalibrationReport>(deps, baseUrl, "/forecast/calibration");
       return asJson ? JSON.stringify(report) : formatCalibration(report);
+    }
+    case "ask": {
+      const text = positionals[0];
+      if (!text) throw new Error(`missing question text\n${FORECAST_USAGE}`);
+      if (options.prob === undefined) throw new Error("missing --prob <0..1>");
+      if (!options.by) throw new Error("missing --by <YYYY-MM-DD or ISO>");
+      const resolveBy = /^\d{4}-\d{2}-\d{2}$/.test(options.by)
+        ? `${options.by}T23:59:59Z`
+        : options.by;
+      const qid = deps.uuid();
+      const at = deps.now();
+      const question = QuestionSchema.safeParse({
+        id: qid,
+        text,
+        createdAt: at,
+        resolveBy,
+        resolutionCriteria: options.criteria,
+        tags: options.tags
+          ? options.tags.split(",").map((s) => s.trim()).filter(Boolean)
+          : []
+      });
+      if (!question.success) throw zodError("question", question.error);
+      const prediction = PredictionSchema.safeParse({
+        id: deps.uuid(),
+        questionId: qid,
+        probability: Number(options.prob),
+        madeAt: at
+      });
+      if (!prediction.success) throw zodError("prediction", prediction.error);
+      await httpPost(deps, baseUrl, "/forecast/question", {
+        question: question.data,
+        prediction: prediction.data
+      });
+      return asJson
+        ? JSON.stringify({ questionId: qid, predictionId: prediction.data.id })
+        : `✓ asked — ${qid}\n  ${pct(prediction.data.probability)}  ${text}`;
+    }
+    case "resolve": {
+      const [qid, outcomeRaw] = positionals;
+      if (!qid || outcomeRaw === undefined) {
+        throw new Error(
+          `usage: decision-forge forecast resolve <questionId> <true|false> [--notes N]`
+        );
+      }
+      const outcome = parseOutcome(outcomeRaw);
+      const resolution = ResolutionSchema.safeParse({
+        questionId: qid,
+        outcome,
+        resolvedAt: deps.now(),
+        notes: options.notes
+      });
+      if (!resolution.success) throw zodError("resolution", resolution.error);
+      await httpPost(deps, baseUrl, "/forecast/resolve", resolution.data);
+      return asJson
+        ? JSON.stringify({ ok: true, questionId: qid, outcome })
+        : `✓ resolved ${qid} → ${outcome === 1 ? "TRUE" : "FALSE"}`;
     }
     default:
       return FORECAST_USAGE;

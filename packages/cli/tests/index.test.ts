@@ -45,6 +45,7 @@ function okFetch(): typeof fetch {
 }
 
 function deps(overrides: Partial<CliDeps> = {}): CliDeps {
+  let n = 0;
   return {
     readFile: async (p: string) => {
       if (p.includes("good")) return JSON.stringify(GOOD_CONFIG);
@@ -54,9 +55,23 @@ function deps(overrides: Partial<CliDeps> = {}): CliDeps {
     },
     fetchImpl: okFetch(),
     env: {},
+    now: () => "2026-06-08T12:00:00.000Z",
+    uuid: () => `00000000-0000-4000-8000-${String(++n).padStart(12, "0")}`,
     ...overrides
   };
 }
+
+/** Capture a single POST: returns the recorded url + parsed body, plus an ok response. */
+function capturePost(): { calls: Array<{ url: string; body: unknown }>; fetchImpl: typeof fetch } {
+  const calls: Array<{ url: string; body: unknown }> = [];
+  const fetchImpl = (async (url: string | URL, init?: RequestInit) => {
+    calls.push({ url: String(url), body: JSON.parse(String(init?.body ?? "null")) });
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }) as unknown as typeof fetch;
+  return { calls, fetchImpl };
+}
+
+const A_UUID = "11111111-1111-4111-8111-111111111111";
 
 describe("cli — base", () => {
   it("version prints 0.1.0", async () => {
@@ -284,5 +299,123 @@ describe("cli — forecast", () => {
     await expect(
       run(["forecast", "list"], deps({ fetchImpl: errFetch }))
     ).rejects.toThrow(/503|forecast/i);
+  });
+});
+
+describe("cli — forecast ask", () => {
+  it("posts a question + prediction with injected id/clock", async () => {
+    const { calls, fetchImpl } = capturePost();
+    const out = await run(
+      ["forecast", "ask", "Will revenue exceed 50?", "--prob", "0.7", "--by", "2026-09-01"],
+      deps({ fetchImpl })
+    );
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe("http://127.0.0.1:8765/forecast/question");
+    const body = calls[0]!.body as {
+      question: Record<string, unknown>;
+      prediction: Record<string, unknown>;
+    };
+    expect(body.question.text).toBe("Will revenue exceed 50?");
+    expect(body.question.createdAt).toBe("2026-06-08T12:00:00.000Z");
+    expect(body.question.resolveBy).toBe("2026-09-01T23:59:59Z"); // date-only normalised to end of day
+    expect(body.prediction.probability).toBe(0.7);
+    expect(body.prediction.questionId).toBe(body.question.id); // server requires this match
+    expect(out).toMatch(/asked/i);
+  });
+
+  it("splits --tags on commas", async () => {
+    const { calls, fetchImpl } = capturePost();
+    await run(
+      ["forecast", "ask", "Q?", "--prob", "0.5", "--by", "2026-09-01", "--tags", "mc, deal ,risk"],
+      deps({ fetchImpl })
+    );
+    const body = calls[0]!.body as { question: { tags: string[] } };
+    expect(body.question.tags).toEqual(["mc", "deal", "risk"]);
+  });
+
+  it("passes a full ISO --by through unchanged", async () => {
+    const { calls, fetchImpl } = capturePost();
+    await run(
+      ["forecast", "ask", "Q?", "--prob", "0.5", "--by", "2026-09-01T10:00:00Z"],
+      deps({ fetchImpl })
+    );
+    const body = calls[0]!.body as { question: { resolveBy: string } };
+    expect(body.question.resolveBy).toBe("2026-09-01T10:00:00Z");
+  });
+
+  it("--json reports the new ids", async () => {
+    const { fetchImpl } = capturePost();
+    const out = await run(
+      ["forecast", "ask", "Q?", "--prob", "0.5", "--by", "2026-09-01", "--json"],
+      deps({ fetchImpl })
+    );
+    const parsed = JSON.parse(out);
+    expect(parsed.questionId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(parsed.predictionId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("requires question text", async () => {
+    const { calls, fetchImpl } = capturePost();
+    await expect(
+      run(["forecast", "ask", "--prob", "0.5", "--by", "2026-09-01"], deps({ fetchImpl }))
+    ).rejects.toThrow(/text|usage/i);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("requires --prob", async () => {
+    const { fetchImpl } = capturePost();
+    await expect(
+      run(["forecast", "ask", "Q?", "--by", "2026-09-01"], deps({ fetchImpl }))
+    ).rejects.toThrow(/prob/i);
+  });
+
+  it("rejects an out-of-range probability before posting", async () => {
+    const { calls, fetchImpl } = capturePost();
+    await expect(
+      run(["forecast", "ask", "Q?", "--prob", "5", "--by", "2026-09-01"], deps({ fetchImpl }))
+    ).rejects.toThrow(/probab|invalid/i);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("cli — forecast resolve", () => {
+  it("posts a resolution with outcome 1 for true", async () => {
+    const { calls, fetchImpl } = capturePost();
+    const out = await run(["forecast", "resolve", A_UUID, "true"], deps({ fetchImpl }));
+    expect(calls[0]!.url).toBe("http://127.0.0.1:8765/forecast/resolve");
+    const body = calls[0]!.body as Record<string, unknown>;
+    expect(body.questionId).toBe(A_UUID);
+    expect(body.outcome).toBe(1);
+    expect(body.resolvedAt).toBe("2026-06-08T12:00:00.000Z");
+    expect(out).toMatch(/true/i);
+  });
+
+  it("maps false/0 to outcome 0", async () => {
+    const { calls, fetchImpl } = capturePost();
+    await run(["forecast", "resolve", A_UUID, "0"], deps({ fetchImpl }));
+    expect((calls[0]!.body as Record<string, unknown>).outcome).toBe(0);
+  });
+
+  it("rejects a non-boolean outcome", async () => {
+    const { calls, fetchImpl } = capturePost();
+    await expect(
+      run(["forecast", "resolve", A_UUID, "maybe"], deps({ fetchImpl }))
+    ).rejects.toThrow(/outcome|true|false/i);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("rejects a non-uuid question id before posting", async () => {
+    const { calls, fetchImpl } = capturePost();
+    await expect(
+      run(["forecast", "resolve", "not-a-uuid", "true"], deps({ fetchImpl }))
+    ).rejects.toThrow(/questionId|invalid|uuid/i);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("requires both arguments", async () => {
+    const { fetchImpl } = capturePost();
+    await expect(
+      run(["forecast", "resolve", A_UUID], deps({ fetchImpl }))
+    ).rejects.toThrow(/usage|outcome/i);
   });
 });
