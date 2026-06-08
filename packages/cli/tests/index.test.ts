@@ -186,3 +186,103 @@ describe("cli — mc run", () => {
     expect(called).toBe(false);
   });
 });
+
+const FAKE_QUESTIONS = [
+  {
+    id: "q1",
+    text: "Will revenue exceed 50?",
+    latestProbability: 0.72,
+    resolved: true,
+    outcome: 1,
+    tags: ["monte-carlo"]
+  },
+  {
+    id: "q2",
+    text: "Will the deal close by Q3?",
+    latestProbability: 0.3,
+    resolved: false,
+    outcome: null,
+    tags: []
+  }
+];
+
+const FAKE_CALIB = {
+  count: 12,
+  brier: 0.184,
+  buckets: [
+    { predicted: 0.7, actual: 0.66, n: 5 },
+    { predicted: 0.3, actual: 0.25, n: 4 }
+  ]
+};
+
+/** A fetch that answers the two forecast GET endpoints by path. */
+function forecastFetch(): typeof fetch {
+  return (async (url: string | URL) => {
+    const u = String(url);
+    if (u.endsWith("/forecast/questions"))
+      return new Response(JSON.stringify(FAKE_QUESTIONS), { status: 200 });
+    if (u.endsWith("/forecast/calibration"))
+      return new Response(JSON.stringify(FAKE_CALIB), { status: 200 });
+    return new Response("not found", { status: 404 });
+  }) as unknown as typeof fetch;
+}
+
+describe("cli — forecast", () => {
+  it("bare `forecast` lists its subcommands", async () => {
+    const out = await run(["forecast"], deps({ fetchImpl: forecastFetch() }));
+    expect(out).toMatch(/list/i);
+    expect(out).toMatch(/calibration/i);
+  });
+
+  it("list prints a journal table", async () => {
+    const out = await run(["forecast", "list"], deps({ fetchImpl: forecastFetch() }));
+    expect(out).toContain("Will revenue exceed 50?");
+    expect(out).toContain("Will the deal close by Q3?");
+    expect(out).toContain("72%");
+    expect(out).toMatch(/true/i); // resolved outcome of q1
+    expect(out).toMatch(/open/i); // q2 still open
+  });
+
+  it("list --json emits the raw array", async () => {
+    const out = await run(["forecast", "list", "--json"], deps({ fetchImpl: forecastFetch() }));
+    expect(JSON.parse(out)).toEqual(FAKE_QUESTIONS);
+  });
+
+  it("list handles an empty journal", async () => {
+    const empty = (async () => new Response("[]", { status: 200 })) as unknown as typeof fetch;
+    const out = await run(["forecast", "list"], deps({ fetchImpl: empty }));
+    expect(out).toMatch(/0 question|none/i);
+  });
+
+  it("list GETs the questions endpoint", async () => {
+    let captured: string | undefined;
+    let method: string | undefined;
+    const spy = (async (url: string | URL, init?: RequestInit) => {
+      captured = String(url);
+      method = init?.method ?? "GET";
+      return new Response("[]", { status: 200 });
+    }) as unknown as typeof fetch;
+    await run(["forecast", "list", "--url", "http://host:1234"], deps({ fetchImpl: spy }));
+    expect(captured).toBe("http://host:1234/forecast/questions");
+    expect(method).toBe("GET");
+  });
+
+  it("calibration prints the Brier score and buckets", async () => {
+    const out = await run(["forecast", "calibration"], deps({ fetchImpl: forecastFetch() }));
+    expect(out).toMatch(/brier/i);
+    expect(out).toContain("0.184");
+    expect(out).toMatch(/12/); // count
+  });
+
+  it("calibration --json emits the raw report", async () => {
+    const out = await run(["forecast", "calibration", "--json"], deps({ fetchImpl: forecastFetch() }));
+    expect(JSON.parse(out)).toEqual(FAKE_CALIB);
+  });
+
+  it("surfaces a sidecar error", async () => {
+    const errFetch = (async () => new Response("nope", { status: 503 })) as unknown as typeof fetch;
+    await expect(
+      run(["forecast", "list"], deps({ fetchImpl: errFetch }))
+    ).rejects.toThrow(/503|forecast/i);
+  });
+});

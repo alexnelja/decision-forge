@@ -19,8 +19,10 @@ What exists in `packages/`:
   <config.json>` type-checks a Monte Carlo config against `core`'s schema (no
   sidecar needed); `decision-forge mc run <config.json> [--url U] [--json]` posts
   it to the py-engine `/mc/run` and prints a stats table (or raw JSON with
-  `--json`). Sidecar URL resolves from `--url` → `$SIDECAR_URL` →
-  `http://127.0.0.1:8765`. 15 vitest tests.
+  `--json`). `decision-forge forecast list` / `forecast calibration` read the
+  forecast journal (`/forecast/questions`, `/forecast/calibration`) as a table or
+  `--json`. Sidecar URL resolves from `--url` → `$SIDECAR_URL` →
+  `http://127.0.0.1:8765`. 24 vitest tests.
 
 ## Setup & Run
 

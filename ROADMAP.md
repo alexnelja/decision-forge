@@ -70,8 +70,10 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I; MC → BATNA (`{refMCVar, percentile}` in Nego) shipped (Plan 4.5). Reverse direction (forecast → MC param distribution) still open
 - [ ] Visual/interaction polish per design §10
 - [ ] Packaging, code-signing, auto-update
-- [/] CLI package (`packages/cli/`) — `version`, `mc validate <config.json>`, and
-  `mc run <config.json> [--url U] [--json]` ship (reuses `core` `MCConfigSchema`,
-  posts to the py-engine `/mc/run`, prints a stats table or raw JSON; injectable
-  `readFile`/`fetch`/`env` for tests; 15 vitest tests). Remaining: forecast/scenario
+- [/] CLI package (`packages/cli/`) — `version`; `mc validate <config.json>` and
+  `mc run <config.json> [--url U] [--json]` (reuses `core` `MCConfigSchema`, posts
+  to `/mc/run`); `forecast list` and `forecast calibration` (read the journal via
+  `/forecast/questions` + `/forecast/calibration`). Stats table or raw `--json`;
+  shared flag parser; injectable `readFile`/`fetch`/`env`; 24 vitest tests.
+  Remaining: forecast write subcommands (ask/predict/resolve), scenario
   subcommands, optional sidecar auto-spawn.
