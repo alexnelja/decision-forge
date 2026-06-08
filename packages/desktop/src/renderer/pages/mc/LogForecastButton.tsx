@@ -115,18 +115,19 @@ export function LogForecastButton({
       )}
 
       {open && (
-        <>
+        <div className="fixed inset-0 z-30 flex items-center justify-center p-6">
           {/* Backdrop — captures clicks outside */}
           <div
-            className="fixed inset-0 z-10 bg-paper/40 backdrop-blur-[2px]"
+            className="absolute inset-0 bg-paper/40 backdrop-blur-[2px]"
             onClick={() => setOpen(false)}
             aria-hidden="true"
           />
-          {/* Perforated slip */}
+          {/* Perforated slip — centered modal, clamped to the viewport so it
+              never spills off the narrow marginalia column's right edge. */}
           <div
             role="dialog"
             aria-modal="true"
-            className="slip absolute right-0 top-full z-20 mt-4 w-[360px] space-y-5 px-6 py-7 fade-up"
+            className="slip relative z-10 max-h-[calc(100vh-3rem)] w-[360px] max-w-[calc(100vw-3rem)] space-y-5 overflow-auto px-6 py-7 fade-up"
             style={{ animationDuration: "350ms" }}
           >
             <div className="absolute right-6 top-3 flex items-baseline gap-2 font-mono text-[9px] uppercase tracking-[0.3em] text-ink-dim">
@@ -235,7 +236,7 @@ export function LogForecastButton({
               </button>
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );

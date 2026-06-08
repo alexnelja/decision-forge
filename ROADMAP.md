@@ -59,14 +59,14 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [x] Multi-issue offers with per-issue sliders — continuous + discrete issues, add/remove with weight rebalancing, full terms map in offers (`971c0c6`)
 - [x] Timeline scrubber / replay — Play/Pause/Rewind/End, cursor-synced ZOPA dot, transcript dimming past cursor in Debrief (`971c0c6`)
 - [x] Nego E2E via `ScriptedDriver` — `DECISION_FORGE_NEGO_SCRIPT` env makes sidecar deterministic regardless of Anthropic key; `tests/e2e/nego.spec.ts` covers key-prompt → BEGIN → offer → accept → handshake → scrubber (`971c0c6`)
-- [x] MC variable → BATNA linkage (`{refMCVar, percentile}`) fully wired — schema extends with optional percentile (default 50); `/nego/start` accepts pre-resolved `mc_samples` scalar map; session persists them; `batna_value` threads through `seat_utility` debrief AND `build_persona_prompt`; renderer ships `BatnaPicker` + `mc-percentile` helper + `mc-store` pub/sub; Setup buyer BATNA toggles to Link-to-MC and resolves percentile at BEGIN. E2E in `nego-batna.spec.ts` (skipped pending pre-existing bundle bug, see `BUGS.md`). Plan 4.5 spec: `docs/superpowers/specs/2026-05-19-nego-mc-batna-linkage.md`.
+- [x] MC variable → BATNA linkage (`{refMCVar, percentile}`) fully wired — schema extends with optional percentile (default 50); `/nego/start` accepts pre-resolved `mc_samples` scalar map; session persists them; `batna_value` threads through `seat_utility` debrief AND `build_persona_prompt`; renderer ships `BatnaPicker` + `mc-percentile` helper + `mc-store` pub/sub; Setup buyer BATNA toggles to Link-to-MC and resolves percentile at BEGIN. E2E in `nego-batna.spec.ts` (passing — the "pre-existing bundle bug" was a misdiagnosed `ELECTRON_RUN_AS_NODE` env leak, now resolved; see `BUGS.md`). Plan 4.5 spec: `docs/superpowers/specs/2026-05-19-nego-mc-batna-linkage.md`.
 - [ ] Thought-bubble reasoning trace — deferred
 - [ ] 3D negotiation table (react-three-fiber) — deferred
 - [ ] SSE streaming of agent turns — deferred (polling works for now)
 
 ## Cross-cutting / Later
 
-- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 5 specs: smoke, forecast, mc, nego, scenarios
+- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 6 specs: smoke, forecast, mc, nego, nego-batna, scenarios (all green)
 - [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I; MC → BATNA (`{refMCVar, percentile}` in Nego) shipped (Plan 4.5). Reverse direction (forecast → MC param distribution) still open
 - [ ] Visual/interaction polish per design §10
 - [ ] Packaging, code-signing, auto-update
