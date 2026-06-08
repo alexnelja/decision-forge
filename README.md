@@ -15,7 +15,12 @@ What exists in `packages/`:
 - **`core/`** — shared TS library. Zod schemas (`scenario`, `forecast`, `mc-config` — full; `nego-config` still placeholder), path helpers, vitest suite.
 - **`desktop/`** — Electron app. Main process includes Scenario I/O, Forecast IPC, MC IPC, sidecar supervisor, keychain stub. Renderer has working Forecast page (ask/list/resolve/calibrate) and Monte Carlo page (VariableCard → SimulationPanel → LogForecastButton bridging § I → § III).
 - **`py-engine/`** — FastAPI sidecar: `/health`, `/forecast` (SQLite persistence + Brier calibration), `/mc/run` (numpy-vectorised sampling, safe formula eval, truncated wire payload). 38 pytest tests.
-- **`cli/`** — CLI stub with version command.
+- **`cli/`** — terminal driver for the engine. `decision-forge mc validate
+  <config.json>` type-checks a Monte Carlo config against `core`'s schema (no
+  sidecar needed); `decision-forge mc run <config.json> [--url U] [--json]` posts
+  it to the py-engine `/mc/run` and prints a stats table (or raw JSON with
+  `--json`). Sidecar URL resolves from `--url` → `$SIDECAR_URL` →
+  `http://127.0.0.1:8765`. 15 vitest tests.
 
 ## Setup & Run
 
