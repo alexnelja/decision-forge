@@ -30,6 +30,20 @@ test("MC run → log P90 → appears in Forecast journal", async () => {
     await window.getByRole("button", { name: /log p90 as forecast/i }).click();
     await expect(window.getByRole("dialog")).toBeVisible();
 
+    // The dialog must render fully within the viewport. Regression guard: it used
+    // to be an `absolute right-0` slip anchored to the narrow marginalia column,
+    // which spilled off the right edge and left the Commit button unreachable.
+    const withinViewport = await window.evaluate(() => {
+      const r = document.querySelector('[role="dialog"]')!.getBoundingClientRect();
+      return (
+        r.left >= 0 &&
+        r.top >= 0 &&
+        r.right <= window.innerWidth &&
+        r.bottom <= window.innerHeight
+      );
+    });
+    expect(withinViewport, "log-forecast dialog should sit fully within the viewport").toBe(true);
+
     // Commit the popover.
     await window.getByRole("button", { name: /^commit$/i }).click();
 
