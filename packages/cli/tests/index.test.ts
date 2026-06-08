@@ -376,6 +376,14 @@ describe("cli — forecast ask", () => {
     ).rejects.toThrow(/probab|invalid/i);
     expect(calls).toHaveLength(0);
   });
+
+  it("rejects a non-numeric probability before posting", async () => {
+    const { calls, fetchImpl } = capturePost();
+    await expect(
+      run(["forecast", "ask", "Q?", "--prob", "abc", "--by", "2026-09-01"], deps({ fetchImpl }))
+    ).rejects.toThrow(/prob/i);
+    expect(calls).toHaveLength(0);
+  });
 });
 
 describe("cli — forecast resolve", () => {

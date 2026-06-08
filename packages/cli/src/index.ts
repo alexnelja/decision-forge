@@ -250,6 +250,10 @@ async function forecastCommand(deps: CliDeps, args: string[]): Promise<string> {
       const text = positionals[0];
       if (!text) throw new Error(`missing question text\n${FORECAST_USAGE}`);
       if (options.prob === undefined) throw new Error("missing --prob <0..1>");
+      const probability = Number(options.prob);
+      if (!Number.isFinite(probability)) {
+        throw new Error(`--prob must be a number in [0,1] (got "${options.prob}")`);
+      }
       if (!options.by) throw new Error("missing --by <YYYY-MM-DD or ISO>");
       const resolveBy = /^\d{4}-\d{2}-\d{2}$/.test(options.by)
         ? `${options.by}T23:59:59Z`
@@ -270,7 +274,7 @@ async function forecastCommand(deps: CliDeps, args: string[]): Promise<string> {
       const prediction = PredictionSchema.safeParse({
         id: deps.uuid(),
         questionId: qid,
-        probability: Number(options.prob),
+        probability,
         madeAt: at
       });
       if (!prediction.success) throw zodError("prediction", prediction.error);
