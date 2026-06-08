@@ -72,8 +72,9 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [ ] Packaging, code-signing, auto-update
 - [/] CLI package (`packages/cli/`) — `version`; `mc validate <config.json>` and
   `mc run <config.json> [--url U] [--json]` (reuses `core` `MCConfigSchema`, posts
-  to `/mc/run`); `forecast list` and `forecast calibration` (read the journal via
-  `/forecast/questions` + `/forecast/calibration`). Stats table or raw `--json`;
-  shared flag parser; injectable `readFile`/`fetch`/`env`; 24 vitest tests.
-  Remaining: forecast write subcommands (ask/predict/resolve), scenario
+  to `/mc/run`); full `forecast` journal: `list`, `calibration`, `ask <text>
+  --prob P --by DATE [--tags a,b] [--criteria C]`, and `resolve <questionId>
+  <true|false> [--notes N]` (validate against `core` schemas client-side, then
+  POST). Stats/table or raw `--json`; shared flag+options parser; injectable
+  `readFile`/`fetch`/`env`/`now`/`uuid`; 36 vitest tests. Remaining: scenario
   subcommands, optional sidecar auto-spawn.
