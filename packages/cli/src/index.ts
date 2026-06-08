@@ -116,10 +116,16 @@ async function mcCommand(deps: CliDeps, args: string[]): Promise<string> {
       );
     }
     case "run": {
-      const file = rest.find((a) => !a.startsWith("--"));
-      const asJson = rest.includes("--json");
-      const urlIdx = rest.indexOf("--url");
-      const urlFlag = urlIdx >= 0 ? rest[urlIdx + 1] : undefined;
+      let file: string | undefined;
+      let asJson = false;
+      let urlFlag: string | undefined;
+      for (let i = 0; i < rest.length; i++) {
+        const tok = rest[i];
+        if (tok === undefined) continue;
+        if (tok === "--json") asJson = true;
+        else if (tok === "--url") urlFlag = rest[++i]; // consume the value, don't treat it as the path
+        else if (!tok.startsWith("--") && file === undefined) file = tok;
+      }
       const baseUrl = urlFlag ?? deps.env.SIDECAR_URL ?? DEFAULT_SIDECAR_URL;
       const config = await loadConfig(deps, file);
       const result = await postRun(deps, baseUrl, config);

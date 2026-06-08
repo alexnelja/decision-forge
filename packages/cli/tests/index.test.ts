@@ -142,6 +142,20 @@ describe("cli — mc run", () => {
     expect(captured).toBe("http://10.0.0.1:9000/mc/run");
   });
 
+  it("accepts --url before the config path", async () => {
+    let captured: string | undefined;
+    let body: string | undefined;
+    const spy = (async (url: string | URL, init?: RequestInit) => {
+      captured = String(url);
+      body = String(init?.body ?? "");
+      return new Response(JSON.stringify(FAKE_RESULT), { status: 200 });
+    }) as unknown as typeof fetch;
+    await run(["mc", "run", "--url", "http://10.0.0.1:9000", "good.json"], deps({ fetchImpl: spy }));
+    expect(captured).toBe("http://10.0.0.1:9000/mc/run");
+    // The config — not the URL — must be the body that was posted.
+    expect(JSON.parse(body!).formula).toBe("revenue - cost");
+  });
+
   it("falls back to $SIDECAR_URL", async () => {
     let captured: string | undefined;
     const spy = (async (url: string | URL) => {
