@@ -100,9 +100,24 @@ body::after {
 .fade-up-3 { animation-delay: 480ms; }
 .fade-up-4 { animation-delay: 620ms; }
 
-/* Section-colored focus ring for links */
+/*
+ * Keyboard focus — one consistent, high-contrast ring across every control.
+ * Buttons use Tailwind's `focus:outline-none` to drop the mouse-focus outline;
+ * this restores a clear ring for KEYBOARD users only (:focus-visible), so mouse
+ * clicks stay clean while tabbing is always visible. The !important is needed to
+ * win over the per-element `focus:outline-none` utility.
+ */
+button:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--ink) !important;
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+
+/* Links (sidebar nav, home module list) — same ring, no utility to override. */
 .focus-ring:focus-visible {
-  outline: 1px solid currentColor;
+  outline: 2px solid var(--ink);
   outline-offset: 4px;
 }
 

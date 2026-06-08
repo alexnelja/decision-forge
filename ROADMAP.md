@@ -66,9 +66,13 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 
 ## Cross-cutting / Later
 
-- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 6 specs: smoke, forecast, mc, nego, nego-batna, scenarios (all green)
+- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 7 specs: smoke, forecast, mc, nego, nego-batna, scenarios, focus (all green)
 - [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I; MC → BATNA (`{refMCVar, percentile}` in Nego) shipped (Plan 4.5). Reverse direction (forecast → MC param distribution) still open
-- [ ] Visual/interaction polish per design §10
+- [/] Visual/interaction polish per design §10 — keyboard-focus accessibility pass
+  done: one consistent high-contrast `:focus-visible` ring across all buttons/links
+  (overrides the per-element `focus:outline-none` for keyboard users only; mouse
+  clicks stay clean), guarded by `tests/e2e/focus.spec.ts`. Remaining: motion/
+  transition refinement, empty-state polish, 3D centerpieces (deferred).
 - [ ] Packaging, code-signing, auto-update
 - [/] CLI package (`packages/cli/`) — `version`; `mc validate <config.json>` and
   `mc run <config.json> [--url U] [--json]` (reuses `core` `MCConfigSchema`, posts
