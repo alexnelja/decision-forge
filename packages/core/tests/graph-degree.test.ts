@@ -17,5 +17,7 @@ describe("degree", () => {
     const { roots, leaves } = rootsAndLeaves(g);
     expect(roots).toEqual(["a"]);
     expect(leaves).toEqual(["c"]);
+    expect(roots).not.toContain("iso");
+    expect(leaves).not.toContain("iso");
   });
 });

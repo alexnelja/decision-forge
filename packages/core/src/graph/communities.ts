@@ -1,6 +1,7 @@
 // packages/core/src/graph/communities.ts
 import type { GraphInput } from "./types.js";
 
+// Treats edges as UNDIRECTED (union-find) to find weakly-connected components.
 export function communities(g: GraphInput): Map<string, number> {
   const parent = new Map<string, string>();
   const find = (x: string): string => {

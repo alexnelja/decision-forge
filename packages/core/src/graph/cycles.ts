@@ -24,10 +24,10 @@ export function stronglyConnectedComponents(g: GraphInput): string[][] {
     const work: Array<{ v: string; i: number }> = [{ v: start, i: 0 }];
     index.set(start, idx); low.set(start, idx); idx++; stack.push(start); onStack.add(start);
     while (work.length) {
-      const frame = work[work.length - 1];
+      const frame = work[work.length - 1]!;
       const neighbours = adj.get(frame.v)!;
       if (frame.i < neighbours.length) {
-        const w = neighbours[frame.i++];
+        const w = neighbours[frame.i++]!; // bounds-checked by frame.i < neighbours.length
         if (!index.has(w)) {
           index.set(w, idx); low.set(w, idx); idx++; stack.push(w); onStack.add(w);
           work.push({ v: w, i: 0 });
@@ -43,7 +43,7 @@ export function stronglyConnectedComponents(g: GraphInput): string[][] {
         }
         work.pop();
         if (work.length) {
-          const parent = work[work.length - 1].v;
+          const parent = work[work.length - 1]!.v;
           low.set(parent, Math.min(low.get(parent)!, low.get(frame.v)!));
         }
       }
