@@ -209,8 +209,8 @@ Editorial three-column module (matches the app's `ModuleFrame` idiom):
 
 **New dependencies (desktop):** `reactflow`, `dagre` (+ `@types/dagre`),
 `react-force-graph-3d` (pulls `three`). All renderer-side; no sidecar change. Note bundle
--size impact (three.js) — lazy-load both view components (the app already lazy-loads
-`lightweight-charts`).
+-size impact (three.js) — lazy-load both view components via `React.lazy` (no
+lazy-loading precedent exists in the renderer yet; this establishes the pattern).
 
 ---
 
