@@ -35,8 +35,13 @@ export function decisionReadout(map: DependencyMap): Readout {
     return s.has(id) ? s.size - 1 : s.size;
   };
 
+  // Zero-downstream candidates are excluded: a lever that drives nothing
+  // isn't "act first" material, and "0 factors hang on this" reads as noise.
   const rank = (ns: typeof map.nodes) =>
-    [...ns].sort((a, b) => downCount(b.id) - downCount(a.id)).slice(0, TOP);
+    ns
+      .filter((n) => downCount(n.id) > 0)
+      .sort((a, b) => downCount(b.id) - downCount(a.id))
+      .slice(0, TOP);
 
   const actFirst = rank(levers).map((n) => {
     const count = downCount(n.id);

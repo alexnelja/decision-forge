@@ -60,4 +60,40 @@ describe("loopValence", () => {
     expect(loopValence(["a", "b"], g, "x")).toBeUndefined();
     expect(loopValence(["a", "b"], g, undefined)).toBeUndefined();
   });
+
+  it("equal-length + and − paths → vicious, regardless of edge order", () => {
+    // loop a↔b; two 2-hop paths b→x→obj (all +) and b→y→obj (one −).
+    const loopEdges = [
+      { from: "a", to: "b", sign: "+" as const },
+      { from: "b", to: "a", sign: "+" as const },
+    ];
+    const posPath = [
+      { from: "b", to: "x", sign: "+" as const },
+      { from: "x", to: "obj", sign: "+" as const },
+    ];
+    const negPath = [
+      { from: "b", to: "y", sign: "+" as const },
+      { from: "y", to: "obj", sign: "-" as const },
+    ];
+    const nodes = n("a", "b", "x", "y", "obj");
+    // + path listed first
+    expect(loopValence(["a", "b"], { nodes, edges: [...loopEdges, ...posPath, ...negPath] }, "obj")).toBe("vicious");
+    // − path listed first
+    expect(loopValence(["a", "b"], { nodes, edges: [...loopEdges, ...negPath, ...posPath] }, "obj")).toBe("vicious");
+  });
+
+  it("node reachable with both signs: − continuation to objective still found", () => {
+    // m is reached with "+" first (b→m, listed first) and with "−" later
+    // (b→y −, y→m +). Only the −-arrival composes to a negative path since
+    // m→obj is "+". A seen-set keyed by id alone would block the − arrival.
+    const g = { nodes: n("a", "b", "y", "m", "obj"), edges: [
+      { from: "a", to: "b", sign: "+" as const },
+      { from: "b", to: "a", sign: "+" as const },
+      { from: "b", to: "m", sign: "+" as const },  // m seen with + first
+      { from: "b", to: "y", sign: "-" as const },
+      { from: "y", to: "m", sign: "+" as const },  // m again, now with −
+      { from: "m", to: "obj", sign: "+" as const },
+    ]};
+    expect(loopValence(["a", "b"], g, "obj")).toBe("vicious");
+  });
 });

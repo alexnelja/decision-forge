@@ -177,18 +177,58 @@ describe("decisionReadout – planAround external", () => {
 // ── Test 6: top-3 cap ─────────────────────────────────────────────────────────
 
 describe("decisionReadout – top-3 cap", () => {
-  it("actFirst/resolveNext/planAround each capped at 3", () => {
-    // 5 levers, 5 uncertainties, 5 loops
+  it("actFirst/resolveNext capped at 3", () => {
+    // 5 levers and 5 uncertainties, each driving obj (non-zero downstream
+    // so none are filtered out before the cap applies).
     const nodes = [
       node(0, "obj", "objective"),
       ...Array.from({ length: 5 }, (_, i) => node(i + 1, `lever${i}`, "lever")),
       ...Array.from({ length: 5 }, (_, i) => node(i + 6, `unc${i}`, "uncertainty")),
     ];
-    // Levers drive obj. No loops needed; planAround cap is checked via loops test above.
-    const edges = Array.from({ length: 5 }, (_, i) => edge(i + 10, i + 1, 0));
+    // edge id indices 10..19 stay within the 20-entry ids pool
+    const edges = Array.from({ length: 10 }, (_, i) => edge(i + 10, i + 1, 0));
     const map = makeMap({ nodes, edges });
     const r = decisionReadout(map);
-    expect(r.actFirst.length).toBeLessThanOrEqual(3);
-    expect(r.resolveNext.length).toBeLessThanOrEqual(3);
+    expect(r.actFirst).toHaveLength(3);
+    expect(r.resolveNext).toHaveLength(3);
+  });
+
+  it("planAround capped at 3 with 4 loops present", () => {
+    // 4 disjoint two-node loops: (1,2) (3,4) (5,6) (7,8)
+    const nodes = [
+      node(0, "obj", "objective"),
+      ...Array.from({ length: 8 }, (_, i) => node(i + 1, `n${i + 1}`)),
+    ];
+    const edges = [
+      edge(9, 1, 2), edge(10, 2, 1),
+      edge(11, 3, 4), edge(12, 4, 3),
+      edge(13, 5, 6), edge(14, 6, 5),
+      edge(15, 7, 8), edge(16, 8, 7),
+    ];
+    const map = makeMap({ nodes, edges });
+    const r = decisionReadout(map);
+    expect(r.planAround).toHaveLength(3);
+    expect(r.planAround.every((p) => p.kind === "loop")).toBe(true);
+  });
+});
+
+// ── Test 7: zero-downstream filter ───────────────────────────────────────────
+
+describe("decisionReadout – zero-downstream filter", () => {
+  it("levers/uncertainties with no downstream are excluded from rankings", () => {
+    // lever0 drives obj; lever1 and unc0 have NO outgoing edges.
+    const map = makeMap({
+      nodes: [
+        node(0, "obj", "objective"),
+        node(1, "lever0", "lever"),
+        node(2, "lever1", "lever"),
+        node(3, "unc0", "uncertainty"),
+      ],
+      edges: [edge(10, 1, 0)],
+    });
+    const r = decisionReadout(map);
+    expect(r.actFirst).toHaveLength(1);
+    expect(r.actFirst[0]!.nodeId).toBe(ids[1]!);
+    expect(r.resolveNext).toHaveLength(0); // unc0 drives nothing
   });
 });
