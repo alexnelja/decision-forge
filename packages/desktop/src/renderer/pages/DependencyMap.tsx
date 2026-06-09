@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { ModuleFrame } from "../components/ModuleFrame";
-import type { DependencyMap as DMap } from "@decision-forge/core";
+import type { DependencyMap as DMap, DependencyEdge } from "@decision-forge/core";
 import { CapturePanel } from "./depmap/CapturePanel";
+import { LayeredView } from "./depmap/LayeredView";
 
 const EMPTY: DMap = {
   id: crypto.randomUUID(),
@@ -25,6 +26,26 @@ export default function DependencyMap() {
     }));
   }
 
+  function handleAddEdge(from: string, to: string) {
+    // Guard: no self-loops
+    if (from === to) return;
+    // Guard: no duplicate edges (same from+to)
+    const alreadyExists = map.edges.some((e) => e.from === from && e.to === to);
+    if (alreadyExists) return;
+
+    const now = new Date().toISOString();
+    const newEdge: DependencyEdge = {
+      id: crypto.randomUUID(),
+      from,
+      to,
+    };
+    setMap((prev) => ({
+      ...prev,
+      edges: [...prev.edges, newEdge],
+      updatedAt: now,
+    }));
+  }
+
   return (
     <ModuleFrame
       section="§ IV"
@@ -32,16 +53,43 @@ export default function DependencyMap() {
       title="Dependency Map"
       accent="var(--sec-depmap)"
       lede="Map the factors of a decision and the lines of force between them. Read the structure back: what drives what, where the loops are, what a change ripples into."
-      marginalia={
-        <CapturePanel
-          map={map}
-          onAddNode={handleAddNode}
-          selectedId={selectedId}
-          onSelect={setSelectedId}
-        />
-      }
+      marginalia={<div className="eyebrow">Structure</div>}
     >
-      <div className="text-ink-dim">Canvas goes here ({map.nodes.length} factors)</div>
+      {/* Two-column grid: capture panel (fixed narrow) | layered canvas (fills) */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "260px 1fr",
+          gap: "24px",
+          height: "540px",
+        }}
+      >
+        {/* Left: capture panel */}
+        <div
+          style={{
+            borderRight: "1px solid var(--paper-rule)",
+            paddingRight: "20px",
+            overflowY: "auto",
+          }}
+        >
+          <CapturePanel
+            map={map}
+            onAddNode={handleAddNode}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+          />
+        </div>
+
+        {/* Right: layered DAG canvas */}
+        <div style={{ position: "relative" }}>
+          <LayeredView
+            map={map}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onAddEdge={handleAddEdge}
+          />
+        </div>
+      </div>
     </ModuleFrame>
   );
 }
