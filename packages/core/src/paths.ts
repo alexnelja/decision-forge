@@ -13,3 +13,7 @@ export function scenariosDir(override?: string): string {
 export function forecastsDbPath(override?: string): string {
   return path.join(resolveAppDataDir(override), "forecasts.db");
 }
+
+export function mapsDir(override?: string): string {
+  return path.join(resolveAppDataDir(override), "maps");
+}
