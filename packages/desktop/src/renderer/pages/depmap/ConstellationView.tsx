@@ -9,7 +9,7 @@
  * lazy-importing it is safe.
  */
 
-import { useMemo, useCallback } from "react";
+import { useMemo, useCallback, useRef, useState, useEffect } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import type { DependencyMap } from "@decision-forge/core";
 import { reachDownstream, reachUpstream } from "@decision-forge/core";
@@ -39,6 +39,27 @@ export default function ConstellationView({
   selectedId,
   onSelect,
 }: ConstellationViewProps) {
+  // Measure the container so ForceGraph3D gets explicit w/h (prevents overflow).
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dims, setDims] = useState<{ width: number; height: number }>({
+    width: 600,
+    height: 480,
+  });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const update = () => {
+      setDims({ width: el.clientWidth, height: el.clientHeight });
+    };
+    update();
+
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   const { cycleNodeIds, graphInput } = analysis;
   const rootSet = useMemo(() => new Set(analysis.roots), [analysis.roots]);
   const leafSet = useMemo(() => new Set(analysis.leaves), [analysis.leaves]);
@@ -99,10 +120,15 @@ export default function ConstellationView({
   }, [onSelect]);
 
   return (
-    <div style={{ width: "100%", height: "100%", minHeight: "480px", background: BG_COLOR }}>
+    <div
+      ref={containerRef}
+      style={{ width: "100%", height: "100%", minHeight: "480px", background: BG_COLOR }}
+    >
       <ForceGraph3D
         graphData={graphData}
         backgroundColor={BG_COLOR}
+        width={dims.width || undefined}
+        height={dims.height || undefined}
         nodeId="id"
         nodeLabel="name"
         nodeColor={nodeColor}

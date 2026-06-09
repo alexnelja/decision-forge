@@ -4,6 +4,7 @@ import type { DependencyMap as DMap, DependencyEdge } from "@decision-forge/core
 import { CapturePanel } from "./depmap/CapturePanel";
 import { LayeredView } from "./depmap/LayeredView";
 import { StructurePanel } from "./depmap/StructurePanel";
+import { NodeInspector } from "./depmap/NodeInspector";
 import { useAnalysis } from "./depmap/useAnalysis";
 import { mapsApi } from "../lib/maps-api";
 
@@ -29,6 +30,10 @@ export default function DependencyMap() {
   const [map, setMap] = useState<DMap>(makeEmpty);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("layered");
+  // Collapsible capture sidebar: starts pinned open; unpin to get the thin rail.
+  const [sidebarPinned, setSidebarPinned] = useState(true);
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+  const sidebarOpen = sidebarPinned || sidebarHovered;
 
   // Open-dialog state: null = closed, array = list of maps available to load
   const [openList, setOpenList] = useState<Array<{ id: string; name: string }> | null>(null);
@@ -86,6 +91,16 @@ export default function DependencyMap() {
     }));
   }
 
+  function handleUpdateNode(id: string, patch: { label?: string; note?: string }) {
+    setMap((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) =>
+        n.id === id ? { ...n, ...patch } : n
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
   function handleRelayout(positions: Map<string, { x: number; y: number }>) {
     setMap((prev) => ({
       ...prev,
@@ -138,6 +153,8 @@ export default function DependencyMap() {
     setOpenList(null);
   }
 
+  const selectedNode = map.nodes.find((n) => n.id === selectedId) ?? null;
+
   return (
     <ModuleFrame
       section="§ IV"
@@ -145,7 +162,17 @@ export default function DependencyMap() {
       title="Dependency Map"
       accent="var(--sec-depmap)"
       lede="Map the factors of a decision and the lines of force between them. Read the structure back: what drives what, where the loops are, what a change ripples into."
-      marginalia={<StructurePanel map={map} selectedId={selectedId} />}
+      marginalia={
+        <>
+          <NodeInspector
+            node={selectedNode}
+            onUpdate={handleUpdateNode}
+            onDelete={handleDeleteNode}
+            onClose={() => setSelectedId(null)}
+          />
+          <StructurePanel map={map} selectedId={selectedId} />
+        </>
+      }
     >
       {/* ── Header bar: map name + persistence controls + view toggle ── */}
       <div
@@ -277,29 +304,87 @@ export default function DependencyMap() {
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "260px 1fr",
-          gap: "24px",
-          height: "540px",
+          gridTemplateColumns: sidebarOpen ? "260px 1fr" : "14px 1fr",
+          gap: sidebarOpen ? "24px" : "8px",
+          height: "calc(100vh - 320px)",
+          minHeight: "520px",
+          transition: "grid-template-columns 0.22s ease, gap 0.22s ease",
         }}
       >
-        {/* Left: capture panel */}
+        {/* Left: collapsible capture panel rail */}
         <div
+          onMouseEnter={() => setSidebarHovered(true)}
+          onMouseLeave={() => setSidebarHovered(false)}
           style={{
             borderRight: "1px solid var(--paper-rule)",
-            paddingRight: "20px",
-            overflowY: "auto",
+            paddingRight: sidebarOpen ? "20px" : "0",
+            overflowY: sidebarOpen ? "auto" : "hidden",
+            overflowX: "hidden",
+            position: "relative",
+            transition: "padding-right 0.22s ease",
+            cursor: sidebarOpen ? "default" : "e-resize",
           }}
         >
-          <CapturePanel
-            map={map}
-            onAddNode={handleAddNode}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-          />
+          {/* Collapsed rail: faint vertical "Capture" label */}
+          {!sidebarOpen && (
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: "50%",
+                transform: "translate(-50%, -50%) rotate(-90deg)",
+                fontSize: "9px",
+                textTransform: "uppercase",
+                letterSpacing: "0.1em",
+                color: "var(--ink-faint)",
+                whiteSpace: "nowrap",
+                pointerEvents: "none",
+                userSelect: "none",
+              }}
+            >
+              Capture
+            </div>
+          )}
+
+          {/* Pin/unpin toggle — always visible */}
+          <button
+            onClick={() => setSidebarPinned((p) => !p)}
+            title={sidebarPinned ? "Unpin sidebar" : "Pin sidebar open"}
+            style={{
+              position: "absolute",
+              top: "6px",
+              right: sidebarOpen ? "6px" : "50%",
+              transform: sidebarOpen ? "none" : "translateX(50%)",
+              zIndex: 2,
+              background: sidebarPinned ? "var(--sec-depmap)" : "var(--paper-raised)",
+              border: "1px solid var(--paper-rule)",
+              borderRadius: "3px",
+              color: sidebarPinned ? "#fff" : "var(--ink-dim)",
+              fontSize: "9px",
+              padding: "2px 4px",
+              cursor: "pointer",
+              lineHeight: 1,
+              transition: "background 0.15s, color 0.15s",
+            }}
+          >
+            {sidebarPinned ? "●" : "○"}
+          </button>
+
+          {/* The actual capture panel — only rendered when sidebar is open */}
+          {sidebarOpen && (
+            <div style={{ paddingTop: "24px" }}>
+              <CapturePanel
+                map={map}
+                onAddNode={handleAddNode}
+                selectedId={selectedId}
+                onSelect={setSelectedId}
+              />
+            </div>
+          )}
         </div>
 
         {/* Right: layered DAG canvas OR 3D constellation */}
-        <div style={{ position: "relative" }}>
+        <div style={{ position: "relative", height: "100%" }}>
           {viewMode === "layered" ? (
             <LayeredView
               map={map}
@@ -328,6 +413,22 @@ export default function DependencyMap() {
               />
             </Suspense>
           )}
+
+          {/* Direction hint — bottom-left of canvas */}
+          <div
+            style={{
+              position: "absolute",
+              bottom: "10px",
+              left: "12px",
+              fontSize: "10px",
+              color: "var(--ink-faint)",
+              pointerEvents: "none",
+              userSelect: "none",
+              letterSpacing: "0.02em",
+            }}
+          >
+            Drag from a driver → to what it depends on / affects.
+          </div>
         </div>
       </div>
     </ModuleFrame>
