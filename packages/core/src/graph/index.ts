@@ -13,6 +13,7 @@ export * from "./layers.js";
 export * from "./reach.js";
 export * from "./communities.js";
 export * from "./micmac.js";
+export * from "./loops.js";
 
 export function analyze(g: GraphInput) {
   const { roots, leaves } = rootsAndLeaves(g);
