@@ -9,11 +9,11 @@ Plan 1 (current): `../docs/superpowers/plans/2026-04-13-decision-forge-plan-1-fo
 
 ## Status
 
-**Plans 2, 3, 4 complete (2026-04-14).** Forecast Journal, Monte Carlo Sandbox, and Negotiation Dojo all ship. Log a calibrated prediction, run a 10k-iteration simulation, carry a percentile through to a forecast, rehearse a negotiation against an Anthropic-driven opposite number. Cross-module integration (MC → BATNA linkage, 3D visualisations) deferred to Plan 3.5 / 4.5.
+**Plans 2, 3, 4, 5 complete.** Forecast Journal, Monte Carlo Sandbox, Negotiation Dojo, and Dependency Map all ship. Log a calibrated prediction, run a 10k-iteration simulation, carry a percentile through to a forecast, rehearse a negotiation, and build a structural map of decision factors. Cross-module integration (MC → BATNA linkage, 3D visualisations) deferred to Plan 3.5 / 4.5.
 
 What exists in `packages/`:
-- **`core/`** — shared TS library. Zod schemas (`scenario`, `forecast`, `mc-config` — full; `nego-config` still placeholder), path helpers, vitest suite.
-- **`desktop/`** — Electron app. Main process includes Scenario I/O, Forecast IPC, MC IPC, sidecar supervisor, keychain stub. Renderer has working Forecast page (ask/list/resolve/calibrate) and Monte Carlo page (VariableCard → SimulationPanel → LogForecastButton bridging § I → § III).
+- **`core/`** — shared TS library. Zod schemas (`scenario`, `forecast`, `mc-config`, `nego-config`, `dependency-map`), graph algorithms (degree, cycles/Tarjan, topological layers, reachability, communities, MICMAC), path helpers, vitest suite.
+- **`desktop/`** — Electron app. Main process includes Scenario I/O, Forecast IPC, MC IPC, Maps IPC (JSON-per-map under `~/DecisionForge/maps/`), sidecar supervisor, keychain. Renderer has Forecast page, Monte Carlo page (VariableCard → SimulationPanel → LogForecastButton bridging § I → § III), Negotiation Dojo, and § IV Dependency Map page (CapturePanel + layered DAG view via `reactflow`+`dagre` + lazy-loaded 3D constellation via `react-force-graph-3d` + StructurePanel with structural analysis). New renderer deps: `reactflow`, `dagre`, `react-force-graph-3d` (pulls `three`).
 - **`py-engine/`** — FastAPI sidecar: `/health`, `/forecast` (SQLite persistence + Brier calibration), `/mc/run` (numpy-vectorised sampling, safe formula eval, truncated wire payload). 38 pytest tests.
 - **`cli/`** — terminal driver for the engine. `decision-forge mc validate
   <config.json>` type-checks a Monte Carlo config against `core`'s schema (no
@@ -72,9 +72,10 @@ Electron main spawns the Python sidecar on launch, waits for `/health`, then loa
 See `ROADMAP.md` for details.
 
 - [x] Plan 1 — Foundation (monorepo, Electron shell, Python sidecar supervisor, core schemas)
-- [ ] Plan 2 — Forecast Journal (SQLite at `~/DecisionForge/forecasts.db`, calibration scoring)
-- [ ] Plan 3 — Monte Carlo Sandbox (fill in `MCConfigSchema`, simulation engine, charts)
-- [ ] Plan 4 — Negotiation Dojo (Anthropic integration via keytar, nego config + transcripts)
+- [x] Plan 2 — Forecast Journal (SQLite at `~/DecisionForge/forecasts.db`, calibration scoring)
+- [x] Plan 3 — Monte Carlo Sandbox (fill in `MCConfigSchema`, simulation engine, charts)
+- [x] Plan 4 — Negotiation Dojo (Anthropic integration via keytar, nego config + transcripts)
+- [x] Plan 5 — Dependency Map (§ IV hand-built factor graph, layered DAG view, 3D constellation, structural analysis)
 - [ ] Cross-module integration, polish, packaging/signing
 
 ## Known Bugs

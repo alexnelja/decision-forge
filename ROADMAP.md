@@ -64,9 +64,39 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [ ] 3D negotiation table (react-three-fiber) — deferred
 - [ ] SSE streaming of agent turns — deferred (polling works for now)
 
+## Plan 5 — Dependency Map (§ IV) ✅ v1 shipped (2026-06-09)
+
+**Design spec:** `docs/superpowers/specs/2026-06-09-dependency-map-design.md`
+**Implementation plan:** `docs/superpowers/plans/2026-06-09-dependency-map.md`
+
+### v1 shipped
+
+- [x] `DependencyMapSchema` + `DependencyNodeSchema` + `DependencyEdgeSchema` in `@decision-forge/core` (Zod, self-loop / dangling-edge guards, v1.1 optional fields reserved)
+- [x] Graph algorithms in `packages/core/src/graph/`: degree + roots/leaves, topological layers (Kahn), cycle detection (Tarjan SCC), reachability, hub ranking, community detection (weakly-connected components), MICMAC influence/dependence quadrants
+- [x] `analyze()` barrel for single-call structural report
+- [x] `mapsDir()` path helper (mirrors `scenariosDir`)
+- [x] JSON-per-map persistence: `packages/desktop/src/main/maps.ts` + IPC handlers registered in `main/index.ts`
+- [x] Preload + renderer-side `mapsApi` (`packages/desktop/src/renderer/lib/maps-api.ts`)
+- [x] § IV route (`/dependency-map`), sidebar nav entry, `ModuleFrame` with depmap accent
+- [x] `CapturePanel` — type + Enter to add factors; click to select; list with active-node highlight
+- [x] `LayeredView` — `reactflow` canvas with `dagre` auto-layout; drag-to-connect edges; nodes coloured by structural role (root / leaf / hub / cycle)
+- [x] `StructurePanel` (marginalia) — roots, leaves, hubs, cycles, MICMAC quadrant for selected node
+- [x] `ConstellationView` — `react-force-graph-3d` (lazy-loaded; three.js split into its own chunk)
+- [x] View toggle: Layered ↔ 3D (aria-pressed)
+- [x] New / Save / Open persistence controls wired to `mapsApi`
+- [x] 7 e2e specs all green (smoke, forecast, mc, nego, nego-batna, scenarios, depmap)
+
+### v1.1 deferred (schema already reserves fields — no migration needed)
+
+- [ ] Node flags: `type` (objective/factor), `controllability` (control/influence/concern), `uncertainty` (flag + impact level)
+- [ ] Edge `sign` (+/−) for causal polarity
+- [ ] Decision Readout panel — auto-classify objectives vs. factors, highlight uncertain high-impact nodes
+- [ ] DEMATEL-lite leverage scores (total-influence matrix T)
+- [ ] Monte Carlo / Forecast hand-off — link a map node to an MC variable and propagate uncertainty estimates
+
 ## Cross-cutting / Later
 
-- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 6 specs: smoke, forecast, mc, nego, nego-batna, scenarios (all green)
+- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 7 specs: smoke, forecast, mc, nego, nego-batna, scenarios, depmap (all green)
 - [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I; MC → BATNA (`{refMCVar, percentile}` in Nego) shipped (Plan 4.5). Reverse direction (forecast → MC param distribution) still open
 - [ ] Visual/interaction polish per design §10
 - [ ] Packaging, code-signing, auto-update
