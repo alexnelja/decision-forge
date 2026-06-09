@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import MonteCarlo from "./pages/MonteCarlo";
 import Negotiation from "./pages/Negotiation";
 import Forecast from "./pages/Forecast";
+import DependencyMap from "./pages/DependencyMap";
 
 export default function App() {
   const location = useLocation();
@@ -20,6 +21,7 @@ export default function App() {
             <Route path="/mc" element={<MonteCarlo />} />
             <Route path="/negotiation" element={<Negotiation />} />
             <Route path="/forecast" element={<Forecast />} />
+            <Route path="/dependency-map" element={<DependencyMap />} />
           </Routes>
         </main>
       </div>

@@ -3,7 +3,8 @@ import { NavLink } from "react-router-dom";
 const modules = [
   { to: "/mc", roman: "I", label: "Monte Carlo", kicker: "Uncertainty", color: "var(--sec-mc)" },
   { to: "/negotiation", roman: "II", label: "Negotiation", kicker: "Rehearsal", color: "var(--sec-nego)" },
-  { to: "/forecast", roman: "III", label: "Forecast", kicker: "Calibration", color: "var(--sec-forecast)" }
+  { to: "/forecast", roman: "III", label: "Forecast", kicker: "Calibration", color: "var(--sec-forecast)" },
+  { to: "/dependency-map", roman: "IV", label: "Dependency Map", kicker: "Consequence", color: "var(--sec-depmap)" }
 ];
 
 export function Sidebar() {

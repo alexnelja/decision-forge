@@ -31,6 +31,16 @@ const toc = [
     folio: "p. 31",
     accent: "var(--sec-forecast)",
     status: "Plan 2"
+  },
+  {
+    to: "/dependency-map",
+    roman: "IV",
+    kicker: "Consequence",
+    title: "Dependency Map",
+    dek: "A graph of decision factors and the lines of force between them. Read the structure: what drives what, where the loops are, what a change ripples into.",
+    folio: "p. 47",
+    accent: "var(--sec-depmap)",
+    status: "Plan 5"
   }
 ];
 
@@ -41,7 +51,7 @@ export default function Home() {
         <div className="flex items-center gap-4 mb-8 fade-up">
           <span className="eyebrow">In&nbsp;this&nbsp;issue</span>
           <span className="rule flex-1 rule-draw" />
-          <span className="meta">THREE SECTIONS</span>
+          <span className="meta">FOUR SECTIONS</span>
         </div>
 
         <h2
