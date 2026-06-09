@@ -11,10 +11,8 @@ export const DependencyNodeSchema = z.object({
   /** Canvas position persisted so manual drags survive save/load. Optional so
    *  older maps without it still parse (dagre auto-layout fills the gap). */
   position: z.object({ x: z.number(), y: z.number() }).optional(),
-  // --- v1.1 reserved (optional; absent in v1) ---
-  type: z.enum(["objective", "factor"]).optional(),
-  controllability: z.enum(["control", "influence", "concern"]).optional(),
-  uncertainty: z.object({ flag: z.boolean(), impact: z.enum(["low", "high"]).optional() }).optional()
+  /** v1.5 — drives the Decision Readout. Absent ≡ "factor". */
+  role: z.enum(["objective", "lever", "uncertainty", "factor"]).optional()
 });
 export type DependencyNode = z.infer<typeof DependencyNodeSchema>;
 
@@ -22,7 +20,8 @@ export const DependencyEdgeSchema = z.object({
   id: uuid,
   from: uuid, // driver
   to: uuid,   // driven  (from → to means "from drives to")
-  sign: z.enum(["+", "-"]).optional() // v1.1
+  sign: z.enum(["+", "-"]).optional(),       // v1.1
+  confidence: z.enum(["known", "assumption"]).optional() // v1.5; absent ≡ "known"
 });
 export type DependencyEdge = z.infer<typeof DependencyEdgeSchema>;
 
