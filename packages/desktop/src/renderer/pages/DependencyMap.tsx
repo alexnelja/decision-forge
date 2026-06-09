@@ -58,6 +58,45 @@ export default function DependencyMap() {
     });
   }
 
+  function handleUpdateNodePosition(id: string, pos: { x: number; y: number }) {
+    setMap((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) =>
+        n.id === id ? { ...n, position: pos } : n
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
+  function handleDeleteNode(id: string) {
+    setMap((prev) => ({
+      ...prev,
+      nodes: prev.nodes.filter((n) => n.id !== id),
+      edges: prev.edges.filter((e) => e.from !== id && e.to !== id),
+      updatedAt: new Date().toISOString(),
+    }));
+    setSelectedId((prev) => (prev === id ? null : prev));
+  }
+
+  function handleDeleteEdge(id: string) {
+    setMap((prev) => ({
+      ...prev,
+      edges: prev.edges.filter((e) => e.id !== id),
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
+  function handleRelayout(positions: Map<string, { x: number; y: number }>) {
+    setMap((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => {
+        const pos = positions.get(n.id);
+        return pos ? { ...n, position: pos } : n;
+      }),
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
   // --- persistence handlers -------------------------------------------------
 
   async function handleSave() {
@@ -268,6 +307,10 @@ export default function DependencyMap() {
               onSelect={setSelectedId}
               onAddEdge={handleAddEdge}
               analysis={analysis}
+              onUpdateNodePosition={handleUpdateNodePosition}
+              onDeleteNode={handleDeleteNode}
+              onDeleteEdge={handleDeleteEdge}
+              onRelayout={handleRelayout}
             />
           ) : (
             <Suspense
