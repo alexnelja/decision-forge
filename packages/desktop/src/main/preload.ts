@@ -41,6 +41,13 @@ type KeychainApi = {
   has: () => Promise<boolean>;
 };
 
+type MapsApi = {
+  list: () => Promise<Array<{ id: string; name: string }>>;
+  load: (id: string) => Promise<unknown>;
+  save: (map: unknown) => Promise<void>;
+  delete: (id: string) => Promise<void>;
+};
+
 const scenarios: ScenarioApi = {
   list: () => ipcRenderer.invoke("scenarios:list"),
   load: (id) => ipcRenderer.invoke("scenarios:load", id),
@@ -76,11 +83,19 @@ const keychain: KeychainApi = {
   has: () => ipcRenderer.invoke("keychain:has")
 };
 
+const maps: MapsApi = {
+  list: () => ipcRenderer.invoke("maps:list"),
+  load: (id) => ipcRenderer.invoke("maps:load", id),
+  save: (m) => ipcRenderer.invoke("maps:save", m),
+  delete: (id) => ipcRenderer.invoke("maps:delete", id)
+};
+
 contextBridge.exposeInMainWorld("api", {
   sidecarUrl: () => (process.env.SIDECAR_URL ?? "http://127.0.0.1:8765"),
   scenarios,
   forecast,
   mc,
   nego,
-  keychain
+  keychain,
+  maps
 });

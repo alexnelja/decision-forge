@@ -5,6 +5,7 @@ import { registerScenarioIpc } from "./scenarios.js";
 import { registerForecastIpc } from "./forecast.js";
 import { registerMcIpc } from "./mc.js";
 import { registerNegoIpc, getNegoClient } from "./nego.js";
+import { registerMapsIpc } from "./maps.js";
 import {
   getGeminiKey,
   setGeminiKey,
@@ -46,6 +47,7 @@ app.whenReady().then(async () => {
 
   sidecar = await startSidecar({ engineDir, pythonExecutable, port: PORT, env: extraEnv });
   registerScenarioIpc();
+  registerMapsIpc();
   registerForecastIpc(sidecar.baseUrl);
   registerMcIpc(sidecar.baseUrl);
   registerNegoIpc(sidecar.baseUrl);
