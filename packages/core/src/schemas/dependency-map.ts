@@ -8,6 +8,9 @@ export const DependencyNodeSchema = z.object({
   id: uuid,
   label: z.string().min(1),
   note: z.string().optional(),
+  /** Canvas position persisted so manual drags survive save/load. Optional so
+   *  older maps without it still parse (dagre auto-layout fills the gap). */
+  position: z.object({ x: z.number(), y: z.number() }).optional(),
   // --- v1.1 reserved (optional; absent in v1) ---
   type: z.enum(["objective", "factor"]).optional(),
   controllability: z.enum(["control", "influence", "concern"]).optional(),

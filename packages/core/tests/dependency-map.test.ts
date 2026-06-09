@@ -32,4 +32,17 @@ describe("DependencyMapSchema", () => {
       edges: [{ id: E, from: A, to: B, sign: "+" }] };
     expect(() => S.parse(fwd)).not.toThrow();
   });
+
+  it("accepts a node WITH a saved position", () => {
+    const withPos = { ...base,
+      nodes: [{ id: A, label: "demand", position: { x: 120, y: 80 } }, { id: B, label: "margin" }] };
+    const result = S.parse(withPos);
+    expect(result.nodes[0]?.position).toEqual({ x: 120, y: 80 });
+  });
+
+  it("accepts a node WITHOUT a saved position (backward-compat)", () => {
+    // base already has nodes without position — just verify it still parses cleanly
+    const result = S.parse(base);
+    expect(result.nodes[0]?.position).toBeUndefined();
+  });
 });
