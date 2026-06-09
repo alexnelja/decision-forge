@@ -33,16 +33,6 @@ interface ConstellationViewProps {
   onSelect: (id: string) => void;
 }
 
-/** Build neighbour set (direct in + out) for a given node. */
-function directNeighbourIds(map: DependencyMap, nodeId: string): Set<string> {
-  const s = new Set<string>();
-  for (const e of map.edges) {
-    if (e.from === nodeId) s.add(e.to);
-    if (e.to === nodeId) s.add(e.from);
-  }
-  return s;
-}
-
 export default function ConstellationView({
   map,
   analysis,
@@ -54,14 +44,13 @@ export default function ConstellationView({
   const leafSet = useMemo(() => new Set(analysis.leaves), [analysis.leaves]);
 
   // Reachability sets for depth-fade when a node is selected.
-  const { downstream, upstream, neighbours } = useMemo(() => {
-    if (!selectedId) return { downstream: null, upstream: null, neighbours: null };
+  const { downstream, upstream } = useMemo(() => {
+    if (!selectedId) return { downstream: null, upstream: null };
     return {
       downstream: reachDownstream(graphInput, selectedId),
       upstream: reachUpstream(graphInput, selectedId),
-      neighbours: directNeighbourIds(map, selectedId),
     };
-  }, [selectedId, graphInput, map]);
+  }, [selectedId, graphInput]);
 
   const graphData = useMemo(() => ({
     nodes: map.nodes.map((n) => ({ id: n.id, name: n.label })),

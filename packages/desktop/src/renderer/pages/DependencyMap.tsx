@@ -62,22 +62,35 @@ export default function DependencyMap() {
 
   async function handleSave() {
     const updated = { ...map, updatedAt: new Date().toISOString() };
-    setMap(updated);
-    await mapsApi.save(updated);
+    try {
+      await mapsApi.save(updated); // persist FIRST
+      setMap(updated); // only update state on success
+    } catch (err) {
+      console.error("Failed to save map:", err);
+    }
   }
 
   async function handleOpen() {
-    const list = await mapsApi.list();
-    setOpenList(list);
+    try {
+      setOpenList(await mapsApi.list());
+    } catch (err) {
+      console.error("Failed to list maps:", err);
+      setOpenList([]); // don't hang the dialog
+    }
   }
 
   async function handleLoadMap(id: string) {
-    const loaded = await mapsApi.load(id);
-    if (loaded) {
-      setMap(loaded);
-      setSelectedId(null);
+    try {
+      const loaded = await mapsApi.load(id);
+      if (loaded) {
+        setMap(loaded);
+        setSelectedId(null);
+      }
+    } catch (err) {
+      console.error("Failed to load map:", err);
+    } finally {
+      setOpenList(null); // always close the dialog
     }
-    setOpenList(null);
   }
 
   function handleNew() {
