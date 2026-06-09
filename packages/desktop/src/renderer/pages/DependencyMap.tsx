@@ -3,6 +3,8 @@ import { ModuleFrame } from "../components/ModuleFrame";
 import type { DependencyMap as DMap, DependencyEdge } from "@decision-forge/core";
 import { CapturePanel } from "./depmap/CapturePanel";
 import { LayeredView } from "./depmap/LayeredView";
+import { StructurePanel } from "./depmap/StructurePanel";
+import { useAnalysis } from "./depmap/useAnalysis";
 
 const EMPTY: DMap = {
   id: crypto.randomUUID(),
@@ -16,6 +18,9 @@ const EMPTY: DMap = {
 export default function DependencyMap() {
   const [map, setMap] = useState<DMap>(EMPTY);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Compute analysis ONCE here and pass down to both LayeredView and StructurePanel.
+  const analysis = useAnalysis(map);
 
   function handleAddNode(label: string) {
     const now = new Date().toISOString();
@@ -52,7 +57,9 @@ export default function DependencyMap() {
       title="Dependency Map"
       accent="var(--sec-depmap)"
       lede="Map the factors of a decision and the lines of force between them. Read the structure back: what drives what, where the loops are, what a change ripples into."
-      marginalia={<div className="eyebrow">Structure</div>}
+      marginalia={
+        <StructurePanel map={map} selectedId={selectedId} />
+      }
     >
       {/* Two-column grid: capture panel (fixed narrow) | layered canvas (fills) */}
       <div
@@ -86,6 +93,7 @@ export default function DependencyMap() {
             selectedId={selectedId}
             onSelect={setSelectedId}
             onAddEdge={handleAddEdge}
+            analysis={analysis}
           />
         </div>
       </div>
