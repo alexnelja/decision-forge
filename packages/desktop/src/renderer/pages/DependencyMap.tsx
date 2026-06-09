@@ -29,21 +29,20 @@ export default function DependencyMap() {
   function handleAddEdge(from: string, to: string) {
     // Guard: no self-loops
     if (from === to) return;
-    // Guard: no duplicate edges (same from+to)
-    const alreadyExists = map.edges.some((e) => e.from === from && e.to === to);
-    if (alreadyExists) return;
-
-    const now = new Date().toISOString();
-    const newEdge: DependencyEdge = {
-      id: crypto.randomUUID(),
-      from,
-      to,
-    };
-    setMap((prev) => ({
-      ...prev,
-      edges: [...prev.edges, newEdge],
-      updatedAt: now,
-    }));
+    setMap((prev) => {
+      // Guard: no duplicate edges (same from+to) — checked against latest state
+      if (prev.edges.some((e) => e.from === from && e.to === to)) return prev;
+      const newEdge: DependencyEdge = {
+        id: crypto.randomUUID(),
+        from,
+        to,
+      };
+      return {
+        ...prev,
+        edges: [...prev.edges, newEdge],
+        updatedAt: new Date().toISOString(),
+      };
+    });
   }
 
   return (

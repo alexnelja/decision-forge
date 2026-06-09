@@ -1,5 +1,6 @@
 import "reactflow/dist/style.css";
 
+import { useMemo } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -38,13 +39,17 @@ function toFlowGraph(map: DependencyMap): { nodes: Node[]; edges: Edge[] } {
     },
   }));
 
-  const edges: Edge[] = map.edges.map((e) => ({
-    id: e.id,
-    source: e.from,
-    target: e.to,
-    markerEnd: { type: MarkerType.ArrowClosed, color: "var(--ink-dim)" },
-    style: { stroke: "var(--ink-dim)", strokeWidth: 1.5 },
-  }));
+  // Defensive: drop edges referencing a since-deleted node so they don't break render.
+  const nodeIds = new Set(map.nodes.map((n) => n.id));
+  const edges: Edge[] = map.edges
+    .filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to))
+    .map((e) => ({
+      id: e.id,
+      source: e.from,
+      target: e.to,
+      markerEnd: { type: MarkerType.ArrowClosed, color: "var(--ink-dim)" },
+      style: { stroke: "var(--ink-dim)", strokeWidth: 1.5 },
+    }));
 
   return { nodes, edges };
 }
@@ -55,20 +60,25 @@ export function LayeredView({
   onSelect,
   onAddEdge,
 }: LayeredViewProps) {
-  const { nodes, edges } = toFlowGraph(map);
+  // Memoize so dagre layout doesn't recompute on unrelated re-renders.
+  const { nodes, edges } = useMemo(() => toFlowGraph(map), [map]);
 
-  // Apply selection highlight
-  const styledNodes = nodes.map((n) =>
-    n.id === selectedId
-      ? {
-          ...n,
-          style: {
-            ...n.style,
-            border: "1px solid var(--sec-depmap)",
-            boxShadow: "0 0 0 2px var(--sec-depmap)",
-          },
-        }
-      : n
+  // Apply selection highlight (cheap; only recomputed when nodes/selection change).
+  const styledNodes = useMemo(
+    () =>
+      nodes.map((n) =>
+        n.id === selectedId
+          ? {
+              ...n,
+              style: {
+                ...n.style,
+                border: "1px solid var(--sec-depmap)",
+                boxShadow: "0 0 0 2px var(--sec-depmap)",
+              },
+            }
+          : n
+      ),
+    [nodes, selectedId]
   );
 
   function handleConnect(connection: Connection) {
