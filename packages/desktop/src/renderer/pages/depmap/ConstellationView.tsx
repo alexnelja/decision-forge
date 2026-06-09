@@ -20,8 +20,8 @@ const COLOR_ROOT   = "#c4d82e"; // citron  — root nodes (drivers with no drive
 const COLOR_LEAF   = "#6fa88a"; // sage    — leaf nodes (outcomes with nothing they drive)
 const COLOR_CYCLE  = "#e8582b"; // vermilion — nodes in a cycle
 const COLOR_DEFAULT = "#8f7ae6"; // iris    — everything else
-const COLOR_DIM    = "rgba(143,122,230,0.15)"; // dimmed link colour
-const COLOR_LINK   = "rgba(200,196,220,0.55)"; // default link colour
+const COLOR_DIM    = "rgba(143,122,230,0.18)"; // dimmed link colour
+const COLOR_LINK   = "rgba(200,196,220,0.85)"; // default link colour — raised so lines are visible
 const BG_COLOR     = "#0d0c0a"; // almost-black background
 
 // ---------------------------------------------------------------------------
@@ -108,6 +108,8 @@ export default function ConstellationView({
         nodeColor={nodeColor}
         nodeOpacity={nodeOpacity}
         linkColor={linkColor}
+        linkWidth={1}
+        linkOpacity={0.55}
         linkDirectionalArrowLength={4}
         linkDirectionalArrowRelPos={1}
         onNodeClick={handleNodeClick}
