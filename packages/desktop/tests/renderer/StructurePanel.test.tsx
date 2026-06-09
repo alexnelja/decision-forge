@@ -36,7 +36,9 @@ describe("StructurePanel", () => {
 
   it("shows roots (drivers) and leaves (outcomes) counts", () => {
     render(<StructurePanel map={map} selectedId={null} />);
-    expect(screen.getByText(/drivers/i)).toBeInTheDocument();
+    // "Drivers" appears twice (count label + MICMAC quadrant label); scope to
+    // the count-row <span> to disambiguate from the SVG quadrant <text>.
+    expect(screen.getByText("Drivers", { selector: "span" })).toBeInTheDocument();
     expect(screen.getByText(/outcomes/i)).toBeInTheDocument();
   });
 

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { analyze, findCycles, reachDownstream, reachUpstream } from "@decision-forge/core";
+import { analyze, findCycles, reachDownstream } from "@decision-forge/core";
 import type { DependencyMap } from "@decision-forge/core";
 
 export type Analysis = ReturnType<typeof analyze> & {
@@ -29,6 +29,9 @@ export function useAnalysis(map: DependencyMap): Analysis {
     // AND they participate in the same strongly-connected component.
     // We identify co-SCC membership by checking that each endpoint is
     // reachable from the other (both downstream and upstream).
+    // Cost: this runs two BFS passes per candidate cycle edge — negligible at
+    // this module's ~10–60 node scale. If it ever needs to scale, derive
+    // co-SCC membership from the SCC component-id maps instead of re-BFS'ing.
     const cycleEdgeIds = new Set<string>();
     for (const edge of map.edges) {
       if (cycleNodeIds.has(edge.from) && cycleNodeIds.has(edge.to)) {
@@ -46,22 +49,4 @@ export function useAnalysis(map: DependencyMap): Analysis {
 
     return { ...result, cycleNodeIds, cycleEdgeIds, graphInput };
   }, [map]);
-}
-
-/** Helper: get downstream IDs for the selected node (returns empty set when no selection). */
-export function getDownstream(
-  graphInput: { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> },
-  selectedId: string | null
-): Set<string> {
-  if (!selectedId) return new Set();
-  return reachDownstream(graphInput, selectedId);
-}
-
-/** Helper: get upstream IDs for the selected node. */
-export function getUpstream(
-  graphInput: { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> },
-  selectedId: string | null
-): Set<string> {
-  if (!selectedId) return new Set();
-  return reachUpstream(graphInput, selectedId);
 }

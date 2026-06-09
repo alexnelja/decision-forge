@@ -129,6 +129,26 @@ export function StructurePanel({ map, selectedId }: StructurePanelProps) {
               fontSize={8} fill="var(--ink-faint)" textAnchor="end"
             >high inf</text>
 
+            {/* Quadrant labels — axis: x=influence (right), y=dependence (top).
+                top-left=Dependent, top-right=Linkage,
+                bottom-left=Autonomous, bottom-right=Drivers */}
+            <text
+              x={SVG_PAD + 2} y={SVG_PAD + 8}
+              fontSize={7} fill="var(--ink-faint)" textAnchor="start"
+            >Dependent</text>
+            <text
+              x={SVG_PAD + PLOT_SIZE - 2} y={SVG_PAD + 8}
+              fontSize={7} fill="var(--ink-faint)" textAnchor="end"
+            >Linkage</text>
+            <text
+              x={SVG_PAD + 2} y={SVG_PAD + PLOT_SIZE - 3}
+              fontSize={7} fill="var(--ink-faint)" textAnchor="start"
+            >Autonomous</text>
+            <text
+              x={SVG_PAD + PLOT_SIZE - 2} y={SVG_PAD + PLOT_SIZE - 3}
+              fontSize={7} fill="var(--ink-faint)" textAnchor="end"
+            >Drivers</text>
+
             {/* Dots */}
             {micmacPoints.map((p) => (
               <circle
