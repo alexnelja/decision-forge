@@ -1,6 +1,6 @@
 import { useState, lazy, Suspense } from "react";
 import { ModuleFrame } from "../components/ModuleFrame";
-import type { DependencyMap as DMap, DependencyEdge } from "@decision-forge/core";
+import type { DependencyMap as DMap, DependencyEdge, DependencyNode } from "@decision-forge/core";
 import { CapturePanel } from "./depmap/CapturePanel";
 import { LayeredView } from "./depmap/LayeredView";
 import { StructurePanel } from "./depmap/StructurePanel";
@@ -29,6 +29,7 @@ function makeEmpty(): DMap {
 export default function DependencyMap() {
   const [map, setMap] = useState<DMap>(makeEmpty);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>("layered");
   // Collapsible capture sidebar: starts pinned open; unpin to get the thin rail.
   const [sidebarPinned, setSidebarPinned] = useState(true);
@@ -87,6 +88,122 @@ export default function DependencyMap() {
     setMap((prev) => ({
       ...prev,
       edges: prev.edges.filter((e) => e.id !== id),
+      updatedAt: new Date().toISOString(),
+    }));
+  }
+
+  // ── Task 5 handlers ─────────────────────────────────────────────────────
+
+  /**
+   * Add a node at a specific canvas position.
+   * Passing an empty label immediately puts the node into rename mode.
+   */
+  function handleAddNodeAt(label: string, pos: { x: number; y: number }) {
+    const newId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    setMap((prev) => ({
+      ...prev,
+      nodes: [...prev.nodes, { id: newId, label: label || "New factor", position: pos }],
+      updatedAt: now,
+    }));
+    setSelectedId(newId);
+    setRenamingId(newId);
+  }
+
+  /**
+   * Add a new node connected FROM sourceId at a specific canvas position.
+   * Both node creation and edge creation happen in a single state update.
+   */
+  function handleAddConnectedNodeAt(sourceId: string, pos: { x: number; y: number }) {
+    const newId = crypto.randomUUID();
+    const edgeId = crypto.randomUUID();
+    const now = new Date().toISOString();
+    setMap((prev) => {
+      // Deduplicate: if a node already exists at that source, still add
+      return {
+        ...prev,
+        nodes: [...prev.nodes, { id: newId, label: "New factor", position: pos }],
+        edges: [
+          ...prev.edges,
+          { id: edgeId, from: sourceId, to: newId } as DependencyEdge,
+        ],
+        updatedAt: now,
+      };
+    });
+    setSelectedId(newId);
+    setRenamingId(newId);
+  }
+
+  /**
+   * Duplicate a node: clone label + role, append " (copy)", offset position +24/+24.
+   */
+  function handleDuplicateNode(id: string) {
+    const src = map.nodes.find((n) => n.id === id);
+    if (!src) return;
+    const newId = crypto.randomUUID();
+    const pos = src.position
+      ? { x: src.position.x + 24, y: src.position.y + 24 }
+      : { x: 24, y: 24 };
+    const newNode: DependencyNode = {
+      id: newId,
+      label: `${src.label} (copy)`,
+      position: pos,
+      ...(src.role ? { role: src.role } : {}),
+    };
+    const now = new Date().toISOString();
+    setMap((prev) => ({
+      ...prev,
+      nodes: [...prev.nodes, newNode],
+      updatedAt: now,
+    }));
+    setSelectedId(newId);
+  }
+
+  /**
+   * Rename a node.
+   * If the node was freshly created (renamingId matches) and the label is empty,
+   * delete the node instead (cancel-by-empty).
+   */
+  function handleRenameNode(id: string, label: string) {
+    const trimmed = label.trim();
+    if (!trimmed) {
+      // Cancel-by-empty: delete the fresh node
+      handleDeleteNode(id);
+      return;
+    }
+    setMap((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) =>
+        n.id === id ? { ...n, label: trimmed } : n
+      ),
+      updatedAt: new Date().toISOString(),
+    }));
+    setRenamingId(null);
+  }
+
+  /** Cancel rename (Esc key). Does NOT delete the node — only clears rename mode. */
+  function handleCancelRename(id: string) {
+    // If the node was freshly created and user presses Esc, keep it with "New factor".
+    void id; // id not used but kept for API symmetry
+    setRenamingId(null);
+  }
+
+  /** Enter rename mode for an existing node (e.g. from context menu Rename item). */
+  function handleStartRename(id: string) {
+    setSelectedId(id);
+    setRenamingId(id);
+  }
+
+  /**
+   * Set the role of a node.
+   */
+  function handleSetRole(
+    id: string,
+    role: "objective" | "lever" | "uncertainty" | "factor"
+  ) {
+    setMap((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => (n.id === id ? { ...n, role } : n)),
       updatedAt: new Date().toISOString(),
     }));
   }
@@ -389,6 +506,7 @@ export default function DependencyMap() {
             <LayeredView
               map={map}
               selectedId={selectedId}
+              renamingId={renamingId}
               onSelect={setSelectedId}
               onAddEdge={handleAddEdge}
               analysis={analysis}
@@ -396,6 +514,13 @@ export default function DependencyMap() {
               onDeleteNode={handleDeleteNode}
               onDeleteEdge={handleDeleteEdge}
               onRelayout={handleRelayout}
+              onAddNodeAt={handleAddNodeAt}
+              onAddConnectedNodeAt={handleAddConnectedNodeAt}
+              onDuplicateNode={handleDuplicateNode}
+              onRenameNode={handleRenameNode}
+              onCancelRename={handleCancelRename}
+              onStartRename={handleStartRename}
+              onSetRole={handleSetRole}
             />
           ) : (
             <Suspense

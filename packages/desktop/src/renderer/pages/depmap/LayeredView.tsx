@@ -14,12 +14,21 @@ import ReactFlow, {
   type Connection,
   type NodeMouseHandler,
   type NodeDragHandler,
+  type OnConnectStart,
 } from "reactflow";
 
 import type { DependencyMap } from "@decision-forge/core";
 import { reachDownstream, reachUpstream } from "@decision-forge/core";
 import { layoutPositions } from "./layout";
 import type { Analysis } from "./useAnalysis";
+import { FactorNode, type FactorNodeData } from "./FactorNode";
+import { ContextMenu, type ContextMenuProps } from "./ContextMenu";
+
+// ---------------------------------------------------------------------------
+// Module-level nodeTypes constant — react-flow warns if this is defined inline
+// ---------------------------------------------------------------------------
+
+const nodeTypes = { factor: FactorNode };
 
 // ---------------------------------------------------------------------------
 // Types
@@ -28,6 +37,7 @@ import type { Analysis } from "./useAnalysis";
 export interface LayeredViewProps {
   map: DependencyMap;
   selectedId: string | null;
+  renamingId?: string | null;
   onSelect: (id: string) => void;
   onAddEdge: (from: string, to: string) => void;
   analysis: Analysis;
@@ -35,6 +45,14 @@ export interface LayeredViewProps {
   onDeleteNode: (id: string) => void;
   onDeleteEdge: (id: string) => void;
   onRelayout: (positions: Map<string, { x: number; y: number }>) => void;
+  // Task 5 new props
+  onAddNodeAt: (label: string, pos: { x: number; y: number }) => void;
+  onAddConnectedNodeAt: (sourceId: string, pos: { x: number; y: number }) => void;
+  onDuplicateNode: (id: string) => void;
+  onRenameNode: (id: string, label: string) => void;
+  onCancelRename: (id: string) => void;
+  onStartRename: (id: string) => void;
+  onSetRole: (id: string, role: "objective" | "lever" | "uncertainty" | "factor") => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +88,7 @@ function structuralKey(map: DependencyMap): string {
 function LayeredViewInner({
   map,
   selectedId,
+  renamingId = null,
   onSelect,
   onAddEdge,
   analysis,
@@ -77,11 +96,23 @@ function LayeredViewInner({
   onDeleteNode,
   onDeleteEdge,
   onRelayout,
+  onAddNodeAt,
+  onAddConnectedNodeAt,
+  onDuplicateNode,
+  onRenameNode,
+  onCancelRename,
+  onStartRename,
+  onSetRole,
 }: LayeredViewProps) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const { fitView } = useReactFlow();
+  const [contextMenu, setContextMenu] = useState<ContextMenuProps | null>(null);
+  const { fitView, screenToFlowPosition } = useReactFlow();
+
+  // refs for onConnectEnd (v11 only provides the event, no connectionState)
+  const connectStartRef = useRef<string | null>(null);
+  const didConnectRef = useRef(false);
 
   // Track the last structural key so we can skip the structural sync when only
   // style/selection changed.
@@ -138,19 +169,17 @@ function LayeredViewInner({
 
         return {
           id: mapNode.id,
+          type: "factor",
           position: pos,
-          data: { label: mapNode.label },
-          // Minimal style — will be overwritten by the style effect below,
-          // but we supply defaults so nodes are visible immediately.
-          style: {
-            background: "var(--paper-raised)",
-            color: "var(--ink)",
-            border: "1px solid var(--paper-rule)",
-            borderRadius: "4px",
-            fontSize: "13px",
-            fontFamily: "var(--font-display, inherit)",
-            padding: "6px 12px",
-          },
+          data: {
+            label: mapNode.label,
+            role: mapNode.role,
+            // callbacks wired here so FactorNode can call back into DependencyMap
+            onRename: onRenameNode,
+            onCancelRename,
+            onDuplicate: onDuplicateNode,
+            onDelete: onDeleteNode,
+          } satisfies FactorNodeData,
         };
       });
     });
@@ -180,7 +209,8 @@ function LayeredViewInner({
   }, [structKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Effect 2: STYLE SYNC ────────────────────────────────────────────────
-  // Fires when visual state changes (selection, hover, analysis).
+  // Fires when visual state changes (selection, hover, analysis, renamingId).
+  // Sets data flags on nodes so FactorNode can render the correct visual state.
   // Uses functional updaters so it NEVER clobbers positions.
   useEffect(() => {
     const { cycleNodeIds, cycleEdgeIds, graphInput } = analysis;
@@ -207,49 +237,35 @@ function LayeredViewInner({
         const isDownstream = selectedId ? downstream.has(id) : false;
         const isUpstream = selectedId ? upstream.has(id) : false;
 
-        let opacity = 1;
+        let dimOpacity = 1;
         if (selectedId) {
-          if (!isSelected && !isDownstream && !isUpstream) opacity = 0.2;
+          if (!isSelected && !isDownstream && !isUpstream) dimOpacity = 0.2;
         } else if (hoverNeighbours && hoveredId) {
-          if (id !== hoveredId && !hoverNeighbours.has(id)) opacity = 0.25;
+          if (id !== hoveredId && !hoverNeighbours.has(id)) dimOpacity = 0.25;
         }
 
-        let borderColor = "var(--paper-rule)";
-        let boxShadow = "none";
-        if (isCycle) {
-          borderColor = "var(--sec-nego)";
-          boxShadow = "0 0 0 1.5px var(--sec-nego)";
-        } else if (isSelected) {
-          borderColor = "var(--sec-depmap)";
-          boxShadow = "0 0 0 2px var(--sec-depmap)";
-        } else if (isDownstream) {
-          borderColor = "var(--sec-depmap)";
-          boxShadow = "0 0 0 1px var(--sec-depmap)";
-        } else if (isUpstream) {
-          borderColor = "var(--ink-dim)";
-        } else if (isRoot) {
-          borderColor = "var(--sec-mc)";
-          boxShadow = "0 0 0 2px var(--sec-mc)";
-        } else if (isLeaf) {
-          borderColor = "var(--sec-forecast)";
-          boxShadow = "0 0 0 2px var(--sec-forecast)";
-        }
+        const mapNode = map.nodes.find((mn) => mn.id === id);
 
         return {
           ...n,
-          data: { label: map.nodes.find((mn) => mn.id === id)?.label ?? n.data.label },
-          style: {
-            background: "var(--paper-raised)",
-            color: "var(--ink)",
-            border: `1px solid ${borderColor}`,
-            boxShadow,
-            borderRadius: "4px",
-            fontSize: "13px",
-            fontFamily: "var(--font-display, inherit)",
-            padding: "6px 12px",
-            opacity,
-            transition: "opacity 0.15s ease, box-shadow 0.15s ease",
-          },
+          data: {
+            ...n.data,
+            label: mapNode?.label ?? n.data.label,
+            role: mapNode?.role ?? n.data.role,
+            renaming: id === renamingId,
+            isSelected,
+            isCycle,
+            isRoot,
+            isLeaf,
+            dimOpacity,
+            isDownstream,
+            isUpstream,
+            // callbacks always current
+            onRename: onRenameNode,
+            onCancelRename,
+            onDuplicate: onDuplicateNode,
+            onDelete: onDeleteNode,
+          } satisfies FactorNodeData,
         };
       })
     );
@@ -290,17 +306,47 @@ function LayeredViewInner({
         };
       })
     );
-  }, [analysis, selectedId, hoveredId, map]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [analysis, selectedId, hoveredId, map, renamingId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
   const handleConnect = useCallback(
     (connection: Connection) => {
       if (connection.source && connection.target) {
+        didConnectRef.current = true;
         onAddEdge(connection.source, connection.target);
       }
     },
     [onAddEdge]
+  );
+
+  const handleConnectStart: OnConnectStart = useCallback(
+    (_evt, params) => {
+      connectStartRef.current = params.nodeId ?? null;
+      didConnectRef.current = false;
+    },
+    []
+  );
+
+  const handleConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent) => {
+      if (!didConnectRef.current && connectStartRef.current) {
+        const { clientX, clientY } =
+          "touches" in event ? event.changedTouches[0]! : event;
+        // Only create new node if dropped on the pane (not on an existing node)
+        const target = event.target as Element;
+        const onPane =
+          target?.classList?.contains("react-flow__pane") ||
+          !!target?.closest?.(".react-flow__pane");
+        if (onPane) {
+          const pos = screenToFlowPosition({ x: clientX, y: clientY });
+          onAddConnectedNodeAt(connectStartRef.current, pos);
+        }
+      }
+      connectStartRef.current = null;
+      didConnectRef.current = false;
+    },
+    [onAddConnectedNodeAt, screenToFlowPosition]
   );
 
   const handleNodeClick: NodeMouseHandler = useCallback(
@@ -354,7 +400,93 @@ function LayeredViewInner({
     scheduleFitView();
   }, [map.nodes, map.edges, onRelayout, setRfNodes, scheduleFitView]);
 
+  // Double-click on empty pane → add node at that position in rename mode.
+  // react-flow v11 has no onPaneDoubleClick prop — wire via onDoubleClick on
+  // the wrapper div and guard with closest(".react-flow__pane").
+  const handleWrapperDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      const target = e.target as Element;
+      if (!target?.closest?.(".react-flow__pane")) return;
+      e.preventDefault();
+      const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      onAddNodeAt("", pos);
+    },
+    [onAddNodeAt, screenToFlowPosition]
+  );
+
+  // ⌘D / Ctrl-D: duplicate selected node
+  const handleWrapperKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "d") {
+        if (selectedId) {
+          e.preventDefault();
+          onDuplicateNode(selectedId);
+        }
+      }
+    },
+    [selectedId, onDuplicateNode]
+  );
+
+  // Node context menu
+  const handleNodeContextMenu: NodeMouseHandler = useCallback(
+    (evt, node) => {
+      evt.preventDefault();
+      setContextMenu({
+        type: "node",
+        x: (evt as unknown as MouseEvent).clientX,
+        y: (evt as unknown as MouseEvent).clientY,
+        nodeId: node.id,
+        onRename: (id) => {
+          onSelect(id);
+          onStartRename(id);
+        },
+        onDuplicate: onDuplicateNode,
+        onSetRole: onSetRole,
+        onDelete: onDeleteNode,
+        onClose: () => setContextMenu(null),
+      });
+    },
+    [onSelect, onStartRename, onDuplicateNode, onSetRole, onDeleteNode]
+  );
+
+  // Pane context menu — wired on the wrapper div rather than onPaneContextMenu
+  // because panOnDrag=[1,2] causes react-flow to swallow contextMenu on the pane
+  // when right-click pan is enabled (it prevents default and doesn't call the prop).
+  const handleWrapperContextMenu = useCallback(
+    (evt: React.MouseEvent) => {
+      const target = evt.target as Element;
+      // Only show pane menu when clicking on the pane itself, not on a node
+      const onPane =
+        target?.classList?.contains("react-flow__pane") ||
+        !!target?.closest?.(".react-flow__pane");
+      if (!onPane) return;
+      evt.preventDefault();
+      const flowPos = screenToFlowPosition({
+        x: evt.clientX,
+        y: evt.clientY,
+      });
+      setContextMenu({
+        type: "pane",
+        x: evt.clientX,
+        y: evt.clientY,
+        flowX: flowPos.x,
+        flowY: flowPos.y,
+        onAddNodeAt: (pos) => onAddNodeAt("", pos),
+        onTidy: handleTidy,
+        onClose: () => setContextMenu(null),
+      });
+    },
+    [screenToFlowPosition, onAddNodeAt, handleTidy]
+  );
+
+  // Keep onPaneContextMenu as a no-op fallback for react-flow (it won't fire
+  // with panOnDrag=[1,2] but keeping it avoids a prop warning).
+  const handlePaneContextMenu = useCallback((evt: React.MouseEvent) => {
+    evt.preventDefault();
+  }, []);
+
   const showHairballNotice = map.nodes.length > 20 && !selectedId;
+  const showEmptyHint = map.nodes.length === 0;
 
   return (
     <div
@@ -364,7 +496,32 @@ function LayeredViewInner({
         minHeight: "480px",
         position: "relative",
       }}
+      onDoubleClick={handleWrapperDoubleClick}
+      onKeyDown={handleWrapperKeyDown}
+      onContextMenu={handleWrapperContextMenu}
+      tabIndex={-1} // needs tabIndex to receive keydown
     >
+      {/* ── Empty-state hint ─────────────────────────────────────────────── */}
+      {showEmptyHint && (
+        <div
+          style={{
+            position: "absolute",
+            top: "50%",
+            left: "50%",
+            transform: "translate(-50%, -50%)",
+            zIndex: 5,
+            pointerEvents: "none",
+            color: "var(--ink-faint)",
+            fontSize: "13px",
+            fontFamily: "var(--font-display, inherit)",
+            textAlign: "center",
+            userSelect: "none",
+          }}
+        >
+          Double-click to add your first factor.
+        </div>
+      )}
+
       {showHairballNotice && (
         <div
           style={{
@@ -417,15 +574,20 @@ function LayeredViewInner({
       <ReactFlow
         nodes={rfNodes}
         edges={rfEdges}
+        nodeTypes={nodeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
+        onConnectStart={handleConnectStart}
+        onConnectEnd={handleConnectEnd}
         onNodeClick={handleNodeClick}
         onNodeDragStop={handleNodeDragStop}
         onNodesDelete={handleNodesDelete}
         onEdgesDelete={handleEdgesDelete}
         onNodeMouseEnter={handleNodeMouseEnter}
         onNodeMouseLeave={handleNodeMouseLeave}
+        onNodeContextMenu={handleNodeContextMenu}
+        onPaneContextMenu={handlePaneContextMenu}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         proOptions={{ hideAttribution: true }}
@@ -434,10 +596,17 @@ function LayeredViewInner({
         nodesConnectable={true}
         elementsSelectable={true}
         deleteKeyCode="Backspace"
+        zoomOnDoubleClick={false}
+        selectionOnDrag={true}
+        panOnDrag={[1, 2]}
+        panOnScroll={true}
       >
         <Background color="var(--paper-rule)" gap={24} size={1} />
         <Controls showInteractive={false} />
       </ReactFlow>
+
+      {/* Context menu overlay */}
+      {contextMenu && <ContextMenu {...contextMenu} />}
     </div>
   );
 }
