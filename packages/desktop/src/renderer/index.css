@@ -19,9 +19,10 @@
   --sec-forecast: #6fa88a;
   --sec-depmap: #8f7ae6;
 
-  /* Edge polarity tokens (Task 6) */
-  --plus: #6fa88a;
-  --minus: #e8582b;
+  /* Edge polarity tokens (Task 6) — deliberately aliased to section colours;
+     raw-hex twins for three.js live in depmap/edge-style.ts (PLUS_HEX etc.) */
+  --plus: var(--sec-forecast);
+  --minus: var(--sec-nego);
 
   /* Shared rule token (used by some components directly) */
   --paper-rule: #2a2620;

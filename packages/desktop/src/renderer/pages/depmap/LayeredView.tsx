@@ -33,6 +33,13 @@ import { edgeVisual } from "./edge-style";
 
 const nodeTypes = { factor: FactorNode };
 
+/**
+ * Delay before the deferred fitView fires after a topology change — lets
+ * react-flow finish painting before measuring. Exported so tests can settle
+ * past it deterministically instead of using a magic number.
+ */
+export const FITVIEW_DELAY_MS = 50;
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -171,7 +178,7 @@ function LayeredViewInner({
     fitTimerRef.current = setTimeout(() => {
       fitTimerRef.current = null;
       fitView({ padding: 0.2 });
-    }, 50);
+    }, FITVIEW_DELAY_MS);
   }, [fitView]);
 
   useEffect(
@@ -337,12 +344,15 @@ function LayeredViewInner({
       })
     );
 
+    // O(1) lookup by id instead of O(n) find() inside the per-edge loop.
+    const mapEdgeById = new Map(map.edges.map((me) => [me.id, me]));
+
     setRfEdges((eds) =>
       eds.map((e) => {
         const isCycleEdge = cycleEdgeIds.has(e.id);
 
         // Look up the current edge schema object to get sign/confidence
-        const mapEdge = map.edges.find((me) => me.id === e.id);
+        const mapEdge = mapEdgeById.get(e.id);
 
         let dimmed = false;
         if (selectedId) {
@@ -629,36 +639,38 @@ function LayeredViewInner({
     setSelectedEdgeId(null);
   }, []);
 
-  // Close context menu when the canvas pans or scrolls (react-flow onMove).
+  // Close overlays when the canvas pans or scrolls (react-flow onMove): the
+  // context menu AND the edge toolbar are both anchored to stale screen
+  // positions once the viewport moves, so both must go.
   const handleMove = useCallback(() => {
     if (contextMenu) setContextMenu(null);
+    setSelectedEdgeId(null);
   }, [contextMenu]);
 
   const showHairballNotice = map.nodes.length > 20 && !selectedId;
   const showEmptyHint = map.nodes.length === 0;
 
-  // Compute EdgeToolbar position (screen coords) when an edge is selected.
-  // We use the two endpoint node RF positions to find the midpoint and convert
-  // to screen coordinates via flowToScreenPosition (available in react-flow v11
-  // via getViewport + manual transform, or by using the node DOM positions).
-  // Simplest approach in v11: get node positions from rfNodes and use the
-  // ReactFlow instance to convert via a direct calculation.
   const selectedEdge = selectedEdgeId
     ? map.edges.find((e) => e.id === selectedEdgeId)
     : null;
 
+  // EdgeToolbar anchor: midpoint between the two endpoint node CENTRES
+  // (position is the node's top-left; width/height are measured by react-flow,
+  // fall back to 0 before measurement). flowToScreenPosition returns viewport
+  // coords; subtract the wrapper rect to get overlay-relative coords.
   const edgeToolbarPosition = (() => {
     if (!selectedEdge) return null;
     const srcNode = rfNodes.find((n) => n.id === selectedEdge.from);
     const tgtNode = rfNodes.find((n) => n.id === selectedEdge.to);
     if (!srcNode || !tgtNode) return null;
-    // Midpoint in flow coordinates, then convert to screen coordinates
-    const midFlowX = (srcNode.position.x + tgtNode.position.x) / 2;
-    const midFlowY = (srcNode.position.y + tgtNode.position.y) / 2;
-    // flowToScreenPosition gives us absolute screen coords, but we need
-    // coords relative to the wrapper div for the absolute overlay.
-    // Use flowToScreenPosition then subtract the wrapper's bounding rect.
-    const screenPos = flowToScreenPosition({ x: midFlowX, y: midFlowY });
+    const srcCx = srcNode.position.x + (srcNode.width ?? 0) / 2;
+    const srcCy = srcNode.position.y + (srcNode.height ?? 0) / 2;
+    const tgtCx = tgtNode.position.x + (tgtNode.width ?? 0) / 2;
+    const tgtCy = tgtNode.position.y + (tgtNode.height ?? 0) / 2;
+    const screenPos = flowToScreenPosition({
+      x: (srcCx + tgtCx) / 2,
+      y: (srcCy + tgtCy) / 2,
+    });
     const wrapperRect = wrapperRef.current?.getBoundingClientRect();
     if (!wrapperRect) return screenPos; // fallback to screen coords
     return {
@@ -801,11 +813,19 @@ function LayeredViewInner({
           confidence={selectedEdge.confidence}
           x={edgeToolbarPosition.x}
           y={edgeToolbarPosition.y}
-          onFlip={(id) => { onFlipEdge(id); }}
-          onCycleSign={(id) => { onCycleEdgeSign(id); }}
-          onToggleConfidence={(id) => { onToggleEdgeConfidence(id); }}
+          onFlip={onFlipEdge}
+          onCycleSign={onCycleEdgeSign}
+          onToggleConfidence={onToggleEdgeConfidence}
           onDelete={(id) => { onDeleteEdge(id); setSelectedEdgeId(null); }}
-          onClose={() => { setSelectedEdgeId(null); wrapperRef.current?.focus(); }}
+          onClose={() => {
+            // Escape scoping: when a context menu is open ON TOP of the
+            // toolbar, the same Escape press also reaches the toolbar's
+            // document listener. Let the menu consume that press (ContextMenu
+            // closes itself); the NEXT Escape closes the toolbar.
+            if (contextMenu) return;
+            setSelectedEdgeId(null);
+            wrapperRef.current?.focus();
+          }}
         />
       )}
 

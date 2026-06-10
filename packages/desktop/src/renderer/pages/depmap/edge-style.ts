@@ -15,6 +15,33 @@
 
 import type { DependencyEdge } from "@decision-forge/core";
 
+// ---------------------------------------------------------------------------
+// Raw hex values for consumers that cannot resolve CSS custom properties —
+// three.js materials in Task 8's ConstellationView take real colours, not
+// `var(--plus)` strings. Keep in sync with the tokens in index.css
+// (--plus aliases --sec-forecast, --minus aliases --sec-nego).
+// ---------------------------------------------------------------------------
+
+export const PLUS_HEX = "#6fa88a";
+export const MINUS_HEX = "#e8582b";
+export const NEUTRAL_HEX = "#8a8278"; // --ink-dim
+
+// ---------------------------------------------------------------------------
+// Human-readable labels — single source for EdgeToolbar + ContextMenu copy.
+// ---------------------------------------------------------------------------
+
+/** "+ amplifies" | "− dampens" | "none" */
+export function describeSign(sign: DependencyEdge["sign"]): string {
+  return sign === "+" ? "+ amplifies" : sign === "-" ? "− dampens" : "none";
+}
+
+/** "assumption (dashed)" | "known (solid)" — absent confidence ≡ known */
+export function describeConfidence(
+  confidence: DependencyEdge["confidence"]
+): string {
+  return confidence === "assumption" ? "assumption (dashed)" : "known (solid)";
+}
+
 export interface EdgeVisualResult {
   /** CSS colour string — matches the sign polarity or neutral */
   stroke: string;

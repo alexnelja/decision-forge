@@ -14,6 +14,7 @@
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import type { DependencyEdge } from "@decision-forge/core";
+import { describeSign, describeConfidence } from "./edge-style";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -229,10 +230,11 @@ function PaneMenuItems(props: PaneContextMenuProps) {
 function EdgeMenuItems(props: EdgeContextMenuProps) {
   const { edgeId, sign, confidence, onFlipEdge, onCycleEdgeSign, onToggleEdgeConfidence, onDeleteEdge, onClose } = props;
 
-  // Sign display labels
-  const signLabel = sign === "+" ? "+ amplifies" : sign === "-" ? "− dampens" : "none";
+  // Labels shared with EdgeToolbar via edge-style.ts; only the "next state"
+  // hint is menu-specific.
+  const signLabel = describeSign(sign);
   const nextSignLabel = sign === "+" ? "→ −" : sign === "-" ? "→ none" : "→ +";
-  const confLabel = confidence === "assumption" ? "assumption (dashed)" : "known (solid)";
+  const confLabel = describeConfidence(confidence);
 
   return (
     <>

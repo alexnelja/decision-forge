@@ -13,8 +13,9 @@
  * Closes on Escape.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import type { DependencyEdge } from "@decision-forge/core";
+import { describeSign, describeConfidence } from "./edge-style";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,9 +51,8 @@ export function EdgeToolbar({
   onDelete,
   onClose,
 }: EdgeToolbarProps) {
-  const toolbarRef = useRef<HTMLDivElement>(null);
-
-  // Close on Escape.
+  // Close on Escape. The caller may scope this (e.g. ignore the press while a
+  // context menu is open on top) by guarding inside its onClose.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -63,17 +63,16 @@ export function EdgeToolbar({
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Sign label — show current state
-  const signLabel = sign === "+" ? "+" : sign === "-" ? "−" : "±";
-  const signTitle = sign === "+" ? "Sign: + (amplifies) — click to cycle" : sign === "-" ? "Sign: − (dampens) — click to cycle" : "Sign: none — click to cycle (+/−)";
-
-  // Confidence label
-  const confLabel = confidence === "assumption" ? "▱" : "▰";
-  const confTitle = confidence === "assumption" ? "Confidence: assumption (dashed) — click to toggle" : "Confidence: known (solid) — click to toggle";
+  // Glyphs show current state; titles share label copy with the context menu.
+  const signGlyph = sign === "+" ? "+" : sign === "-" ? "−" : "±";
+  const signTitle = `Sign: ${describeSign(sign)} — click to cycle`;
+  const confGlyph = confidence === "assumption" ? "▱" : "▰";
+  const confTitle = `Confidence: ${describeConfidence(confidence)} — click to toggle`;
 
   return (
     <div
-      ref={toolbarRef}
+      role="toolbar"
+      aria-label="Edge actions"
       data-testid="edge-toolbar"
       style={{
         position: "absolute",
@@ -110,7 +109,7 @@ export function EdgeToolbar({
         ariaLabel="Cycle edge sign"
         onClick={() => onCycleSign(edgeId)}
       >
-        {signLabel}
+        {signGlyph}
       </EdgeToolbarBtn>
 
       {/* Confidence toggle */}
@@ -119,7 +118,7 @@ export function EdgeToolbar({
         ariaLabel="Toggle edge confidence"
         onClick={() => onToggleConfidence(edgeId)}
       >
-        {confLabel}
+        {confGlyph}
       </EdgeToolbarBtn>
 
       <div

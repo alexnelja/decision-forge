@@ -19,6 +19,7 @@ import { it, expect, describe, vi, beforeAll, beforeEach, afterEach } from "vite
 import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import DependencyMap from "../../src/renderer/pages/DependencyMap";
+import { FITVIEW_DELAY_MS } from "../../src/renderer/pages/depmap/LayeredView";
 import type { DependencyMap as DMap } from "@decision-forge/core";
 
 afterEach(cleanup);
@@ -120,12 +121,12 @@ async function renderWithMap(map: DMap) {
       map.edges.length
     );
   });
-  // Let the deferred fitView (50 ms timer in LayeredView) fire BEFORE the
-  // test opens a context menu: the programmatic viewport change triggers
-  // onMove, which intentionally closes any open context menu (pan-closes-menu
-  // behaviour). Without this settle, the menu opened by a test races the
-  // timer and is sporadically closed underneath the assertions.
-  await act(() => new Promise((resolve) => setTimeout(resolve, 80)));
+  // Let the deferred fitView fire BEFORE the test opens a menu/toolbar: the
+  // programmatic viewport change triggers onMove, which intentionally closes
+  // open context menus and the edge toolbar (pan-closes-overlays behaviour).
+  // Without this settle, overlays opened by a test race the timer and are
+  // sporadically closed underneath the assertions.
+  await act(() => new Promise((resolve) => setTimeout(resolve, FITVIEW_DELAY_MS + 30)));
   return utils;
 }
 
@@ -251,10 +252,65 @@ describe("handleCycleEdgeSign — order undefined→'+'→'-'→undefined", () =
     saved = await lastSavedMap();
     expect(saved.edges[0]!.sign).toBe("-");
 
-    // 3rd click: "-" → undefined (key removed)
+    // 3rd click: "-" → none. The sign KEY must be REMOVED from the persisted
+    // edge (not merely set to undefined) so saved JSON stays clean.
     fireEvent.click(signBtn());
     saved = await lastSavedMap();
-    expect(saved.edges[0]!.sign).toBeUndefined();
+    expect("sign" in saved.edges[0]!).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EdgeToolbar lifecycle — closes on viewport movement; Escape scoping
+// ---------------------------------------------------------------------------
+
+describe("EdgeToolbar — closes on pan/zoom (viewport move)", () => {
+  it("toolbar disappears when the viewport moves (Tidy → fitView → onMove)", async () => {
+    const { container } = await renderWithMap(
+      makeMap([{ id: EDGE_AB, from: NODE_A, to: NODE_B }])
+    );
+
+    // Open the toolbar
+    fireEvent.click(container.querySelector(".react-flow__edge")!);
+    await screen.findByTestId("edge-toolbar");
+
+    // Tidy schedules a deferred fitView; the resulting programmatic viewport
+    // change fires onMove — the toolbar must close (otherwise it floats
+    // detached from the edge it annotates).
+    fireEvent.click(screen.getByTitle(/re-run auto-layout/i));
+
+    await waitFor(() => {
+      expect(screen.queryByTestId("edge-toolbar")).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("EdgeToolbar — Escape scoping vs context menu", () => {
+  it("first Escape closes only the context menu; second Escape closes the toolbar", async () => {
+    const { container } = await renderWithMap(
+      makeMap([{ id: EDGE_AB, from: NODE_A, to: NODE_B }])
+    );
+
+    const edgeEl = container.querySelector(".react-flow__edge")!;
+
+    // Open toolbar (edge click), then the edge context menu on top of it
+    fireEvent.click(edgeEl);
+    await screen.findByTestId("edge-toolbar");
+    fireEvent.contextMenu(edgeEl);
+    await screen.findByText(/flip direction/i);
+
+    // First Escape: menu closes, toolbar SURVIVES
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByText(/flip direction/i)).not.toBeInTheDocument();
+    });
+    expect(screen.getByTestId("edge-toolbar")).toBeInTheDocument();
+
+    // Second Escape: toolbar closes
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    await waitFor(() => {
+      expect(screen.queryByTestId("edge-toolbar")).not.toBeInTheDocument();
+    });
   });
 });
 
