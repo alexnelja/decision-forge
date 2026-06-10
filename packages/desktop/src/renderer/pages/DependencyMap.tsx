@@ -250,6 +250,80 @@ export default function DependencyMap() {
     }));
   }, []);
 
+  // ── Task 6 edge handlers ─────────────────────────────────────────────────
+
+  /**
+   * Flip the direction of an edge (swap from/to).
+   * No-op if the reversed edge already exists (would create a duplicate).
+   */
+  const handleFlipEdge = useCallback((id: string) => {
+    setMap((prev) => {
+      const edge = prev.edges.find((e) => e.id === id);
+      if (!edge) return prev;
+      // Guard: refuse if reversed edge already exists
+      if (prev.edges.some((e) => e.from === edge.to && e.to === edge.from)) return prev;
+      return {
+        ...prev,
+        edges: prev.edges.map((e) =>
+          e.id === id ? { ...e, from: e.to, to: e.from } : e
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }, []);
+
+  /**
+   * Cycle the sign of an edge: undefined → "+" → "-" → undefined.
+   */
+  const handleCycleEdgeSign = useCallback((id: string) => {
+    setMap((prev) => ({
+      ...prev,
+      edges: prev.edges.map((e) => {
+        if (e.id !== id) return e;
+        const next = e.sign === undefined ? "+" : e.sign === "+" ? "-" : undefined;
+        const { sign: _sign, ...rest } = e;
+        return next === undefined ? rest as typeof e : { ...rest, sign: next };
+      }),
+      updatedAt: new Date().toISOString(),
+    }));
+  }, []);
+
+  /**
+   * Toggle confidence between undefined/"known" and "assumption".
+   */
+  const handleToggleEdgeConfidence = useCallback((id: string) => {
+    setMap((prev) => ({
+      ...prev,
+      edges: prev.edges.map((e) => {
+        if (e.id !== id) return e;
+        const next = e.confidence === "assumption" ? undefined : "assumption";
+        const { confidence: _conf, ...rest } = e;
+        return next === undefined ? rest as typeof e : { ...rest, confidence: next };
+      }),
+      updatedAt: new Date().toISOString(),
+    }));
+  }, []);
+
+  /**
+   * Re-point an edge to new source/target endpoints.
+   * Refuses self-loops and duplicate edges (no-op).
+   */
+  const handleRepointEdge = useCallback((id: string, conn: { source: string; target: string }) => {
+    const { source, target } = conn;
+    if (source === target) return; // no self-loops
+    setMap((prev) => {
+      // Guard: refuse if this would duplicate an existing edge
+      if (prev.edges.some((e) => e.id !== id && e.from === source && e.to === target)) return prev;
+      return {
+        ...prev,
+        edges: prev.edges.map((e) =>
+          e.id === id ? { ...e, from: source, to: target } : e
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+  }, []);
+
   const handleUpdateNode = useCallback((id: string, patch: { label?: string; note?: string }) => {
     setMap((prev) => ({
       ...prev,
@@ -565,6 +639,10 @@ export default function DependencyMap() {
               onCancelRename={handleCancelRename}
               onStartRename={handleStartRename}
               onSetRole={handleSetRole}
+              onFlipEdge={handleFlipEdge}
+              onCycleEdgeSign={handleCycleEdgeSign}
+              onToggleEdgeConfidence={handleToggleEdgeConfidence}
+              onRepointEdge={handleRepointEdge}
             />
           ) : (
             <Suspense

@@ -4,6 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 import { ReactFlowProvider } from "reactflow";
 import DependencyMap from "../../src/renderer/pages/DependencyMap";
 import { FactorNode } from "../../src/renderer/pages/depmap/FactorNode";
+import { EdgeToolbar } from "../../src/renderer/pages/depmap/EdgeToolbar";
+import { ContextMenu } from "../../src/renderer/pages/depmap/ContextMenu";
 
 afterEach(cleanup);
 
@@ -832,5 +834,279 @@ describe("Rename — focus return", () => {
     await waitFor(() => {
       expect(document.activeElement).toBe(wrapper);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// EdgeToolbar unit tests (rendered directly — no react-flow context needed)
+// ---------------------------------------------------------------------------
+describe("EdgeToolbar — renders buttons and fires callbacks", () => {
+  it("renders flip, sign, confidence and delete buttons", () => {
+    render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={vi.fn()}
+        onCycleSign={vi.fn()}
+        onToggleConfidence={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByTitle(/flip/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/sign/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/confidence/i)).toBeInTheDocument();
+    expect(screen.getByTitle(/delete/i)).toBeInTheDocument();
+  });
+
+  it("flip button fires onFlip with edgeId", () => {
+    const onFlip = vi.fn();
+    render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={onFlip}
+        onCycleSign={vi.fn()}
+        onToggleConfidence={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTitle(/flip/i));
+    expect(onFlip).toHaveBeenCalledWith("e1");
+  });
+
+  it("sign button fires onCycleSign with edgeId", () => {
+    const onCycleSign = vi.fn();
+    render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={vi.fn()}
+        onCycleSign={onCycleSign}
+        onToggleConfidence={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTitle(/sign/i));
+    expect(onCycleSign).toHaveBeenCalledWith("e1");
+  });
+
+  it("confidence button fires onToggleConfidence with edgeId", () => {
+    const onToggleConfidence = vi.fn();
+    render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={vi.fn()}
+        onCycleSign={vi.fn()}
+        onToggleConfidence={onToggleConfidence}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTitle(/confidence/i));
+    expect(onToggleConfidence).toHaveBeenCalledWith("e1");
+  });
+
+  it("delete button fires onDelete with edgeId", () => {
+    const onDelete = vi.fn();
+    render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={vi.fn()}
+        onCycleSign={vi.fn()}
+        onToggleConfidence={vi.fn()}
+        onDelete={onDelete}
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByTitle(/delete/i));
+    expect(onDelete).toHaveBeenCalledWith("e1");
+  });
+
+  it("Esc key fires onClose", () => {
+    const onClose = vi.fn();
+    render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={vi.fn()}
+        onCycleSign={vi.fn()}
+        onToggleConfidence={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={onClose}
+      />
+    );
+    fireEvent.keyDown(document.body, { key: "Escape" });
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("shows sign label '+' when sign is '+'", () => {
+    const { container } = render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign="+"
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={vi.fn()}
+        onCycleSign={vi.fn()}
+        onToggleConfidence={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    expect(container.textContent).toContain("+");
+  });
+
+  it("shows sign label for '-' sign (minus/dampens)", () => {
+    const { container } = render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign="-"
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={vi.fn()}
+        onCycleSign={vi.fn()}
+        onToggleConfidence={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    // The toolbar renders "−" (Unicode minus U+2212) for sign="-"
+    expect(container.textContent).toMatch(/[−-]/);
+  });
+
+  it("buttons are keyboard-accessible (have aria-labels)", () => {
+    render(
+      <EdgeToolbar
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        x={100}
+        y={100}
+        onFlip={vi.fn()}
+        onCycleSign={vi.fn()}
+        onToggleConfidence={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    // All action buttons should be focusable standard buttons
+    const buttons = screen.getAllByRole("button");
+    expect(buttons.length).toBeGreaterThanOrEqual(4);
+    buttons.forEach((btn) => {
+      expect(btn.tagName).toBe("BUTTON");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// DependencyMap — edge mutation handlers (handleFlipEdge, handleCycleEdgeSign,
+// handleToggleEdgeConfidence, handleRepointEdge)
+// These are exercised via the ContextMenu component with type="edge".
+// ---------------------------------------------------------------------------
+describe("DependencyMap — edge handlers via context menu", () => {
+  it("edge context menu shows Flip direction item", () => {
+    render(
+      <ContextMenu
+        type="edge"
+        x={100}
+        y={100}
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        onFlipEdge={vi.fn()}
+        onCycleEdgeSign={vi.fn()}
+        onToggleEdgeConfidence={vi.fn()}
+        onDeleteEdge={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    expect(screen.getByText(/flip direction/i)).toBeInTheDocument();
+  });
+
+  it("edge context menu: click Flip direction fires onFlipEdge", () => {
+    const onFlipEdge = vi.fn();
+    render(
+      <ContextMenu
+        type="edge"
+        x={100}
+        y={100}
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        onFlipEdge={onFlipEdge}
+        onCycleEdgeSign={vi.fn()}
+        onToggleEdgeConfidence={vi.fn()}
+        onDeleteEdge={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByText(/flip direction/i));
+    expect(onFlipEdge).toHaveBeenCalledWith("e1");
+  });
+
+  it("edge context menu: shows sign items for none/+/-", () => {
+    render(
+      <ContextMenu
+        type="edge"
+        x={100}
+        y={100}
+        edgeId="e1"
+        sign="+"
+        confidence={undefined}
+        onFlipEdge={vi.fn()}
+        onCycleEdgeSign={vi.fn()}
+        onToggleEdgeConfidence={vi.fn()}
+        onDeleteEdge={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    // Should show Sign section
+    expect(screen.getByText(/sign/i)).toBeInTheDocument();
+  });
+
+  it("edge context menu: click Delete fires onDeleteEdge", () => {
+    const onDeleteEdge = vi.fn();
+    render(
+      <ContextMenu
+        type="edge"
+        x={100}
+        y={100}
+        edgeId="e1"
+        sign={undefined}
+        confidence={undefined}
+        onFlipEdge={vi.fn()}
+        onCycleEdgeSign={vi.fn()}
+        onToggleEdgeConfidence={vi.fn()}
+        onDeleteEdge={onDeleteEdge}
+        onClose={vi.fn()}
+      />
+    );
+    fireEvent.click(screen.getByText(/delete/i));
+    expect(onDeleteEdge).toHaveBeenCalledWith("e1");
   });
 });

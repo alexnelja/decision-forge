@@ -15,6 +15,7 @@ import ReactFlow, {
   type NodeMouseHandler,
   type NodeDragHandler,
   type OnConnectStart,
+  type EdgeMouseHandler,
 } from "reactflow";
 
 import type { DependencyMap } from "@decision-forge/core";
@@ -23,6 +24,8 @@ import { layoutPositions } from "./layout";
 import type { Analysis } from "./useAnalysis";
 import { FactorNode, type FactorNodeData } from "./FactorNode";
 import { ContextMenu, type ContextMenuProps } from "./ContextMenu";
+import { EdgeToolbar } from "./EdgeToolbar";
+import { edgeVisual } from "./edge-style";
 
 // ---------------------------------------------------------------------------
 // Module-level nodeTypes constant — react-flow warns if this is defined inline
@@ -54,6 +57,11 @@ export interface LayeredViewProps {
   onCancelRename: (id: string) => void;
   onStartRename: (id: string) => void;
   onSetRole: (id: string, role: "objective" | "lever" | "uncertainty" | "factor") => void;
+  // Task 6 edge mutation props
+  onFlipEdge: (id: string) => void;
+  onCycleEdgeSign: (id: string) => void;
+  onToggleEdgeConfidence: (id: string) => void;
+  onRepointEdge: (id: string, conn: { source: string; target: string }) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -119,12 +127,17 @@ function LayeredViewInner({
   onCancelRename,
   onStartRename,
   onSetRole,
+  onFlipEdge,
+  onCycleEdgeSign,
+  onToggleEdgeConfidence,
+  onRepointEdge,
 }: LayeredViewProps) {
   const [rfNodes, setRfNodes, onNodesChange] = useNodesState([]);
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuProps | null>(null);
-  const { fitView, screenToFlowPosition, getNode } = useReactFlow();
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const { fitView, screenToFlowPosition, flowToScreenPosition, getNode } = useReactFlow();
 
   // refs for onConnectEnd (v11 only provides the event, no connectionState)
   const connectStartRef = useRef<string | null>(null);
@@ -232,19 +245,26 @@ function LayeredViewInner({
     setRfEdges(
       map.edges
         .filter((e) => nodeIds.has(e.from) && nodeIds.has(e.to))
-        .map((e) => ({
-          id: e.id,
-          source: e.from,
-          target: e.to,
-          markerEnd: {
-            type: MarkerType.ArrowClosed,
-            color: "var(--ink-dim)",
-          },
-          style: {
-            stroke: "var(--ink-dim)",
-            strokeWidth: 1.5,
-          },
-        }))
+        .map((e) => {
+          const visual = edgeVisual(e, { isCycle: false, dimmed: false });
+          return {
+            id: e.id,
+            source: e.from,
+            target: e.to,
+            // Store sign/confidence on the RF edge data so context menu can read it
+            data: { sign: e.sign, confidence: e.confidence },
+            markerEnd: {
+              type: MarkerType.ArrowClosed,
+              color: visual.stroke,
+            },
+            style: {
+              stroke: visual.stroke,
+              strokeWidth: visual.strokeWidth,
+              ...(visual.strokeDasharray ? { strokeDasharray: visual.strokeDasharray } : {}),
+            },
+            interactionWidth: 20,
+          };
+        })
     );
 
     // Fit view after a topology change (load or add/delete nodes).
@@ -320,9 +340,11 @@ function LayeredViewInner({
     setRfEdges((eds) =>
       eds.map((e) => {
         const isCycleEdge = cycleEdgeIds.has(e.id);
-        const color = isCycleEdge ? "var(--sec-nego)" : "var(--ink-dim)";
 
-        let edgeOpacity = 1;
+        // Look up the current edge schema object to get sign/confidence
+        const mapEdge = map.edges.find((me) => me.id === e.id);
+
+        let dimmed = false;
         if (selectedId) {
           const fromActive =
             e.source === selectedId ||
@@ -332,23 +354,30 @@ function LayeredViewInner({
             e.target === selectedId ||
             downstream.has(e.target) ||
             upstream.has(e.target);
-          if (!fromActive && !toActive) edgeOpacity = 0.1;
+          if (!fromActive && !toActive) dimmed = true;
         } else if (hoverNeighbours && hoveredId) {
           const fromActive =
             e.source === hoveredId || hoverNeighbours.has(e.source);
           const toActive =
             e.target === hoveredId || hoverNeighbours.has(e.target);
-          if (!fromActive && !toActive) edgeOpacity = 0.1;
+          if (!fromActive && !toActive) dimmed = true;
         }
+
+        const visual = edgeVisual(
+          mapEdge ?? { sign: undefined, confidence: undefined },
+          { isCycle: isCycleEdge, dimmed }
+        );
 
         return {
           ...e,
-          markerEnd: { type: MarkerType.ArrowClosed, color },
+          data: { sign: mapEdge?.sign, confidence: mapEdge?.confidence },
+          markerEnd: { type: MarkerType.ArrowClosed, color: visual.stroke },
           style: {
-            stroke: color,
-            strokeWidth: isCycleEdge ? 2 : 1.5,
-            opacity: edgeOpacity,
+            stroke: visual.stroke,
+            strokeWidth: visual.strokeWidth,
+            opacity: visual.opacity,
             transition: "opacity 0.15s ease",
+            ...(visual.strokeDasharray ? { strokeDasharray: visual.strokeDasharray } : {}),
           },
         };
       })
@@ -480,6 +509,13 @@ function LayeredViewInner({
     [selectedId, duplicateNode]
   );
 
+  // Shared close handler: close context menu and return focus to the canvas.
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+    // Return focus to canvas so keyboard shortcuts keep working without a click.
+    wrapperRef.current?.focus();
+  }, []);
+
   // Node context menu
   const handleNodeContextMenu: NodeMouseHandler = useCallback(
     (evt, node) => {
@@ -496,10 +532,10 @@ function LayeredViewInner({
         onDuplicate: duplicateNode,
         onSetRole: onSetRole,
         onDelete: onDeleteNode,
-        onClose: () => setContextMenu(null),
+        onClose: closeContextMenu,
       });
     },
-    [onSelect, onStartRename, duplicateNode, onSetRole, onDeleteNode]
+    [onSelect, onStartRename, duplicateNode, onSetRole, onDeleteNode, closeContextMenu]
   );
 
   // Pane context menu — wired on the wrapper div rather than onPaneContextMenu
@@ -524,10 +560,10 @@ function LayeredViewInner({
         flowY: flowPos.y,
         onAddNodeAt: (pos) => onAddNodeAt("", pos),
         onTidy: handleTidy,
-        onClose: () => setContextMenu(null),
+        onClose: closeContextMenu,
       });
     },
-    [screenToFlowPosition, onAddNodeAt, handleTidy]
+    [screenToFlowPosition, onAddNodeAt, handleTidy, closeContextMenu]
   );
 
   // Keep onPaneContextMenu as a no-op fallback for react-flow (it won't fire
@@ -536,8 +572,100 @@ function LayeredViewInner({
     evt.preventDefault();
   }, []);
 
+  // Edge click: select the edge and show the EdgeToolbar.
+  const handleEdgeClick: EdgeMouseHandler = useCallback(
+    (_evt, edge) => {
+      setSelectedEdgeId(edge.id);
+      // Close any open context menu when edge is selected
+      setContextMenu(null);
+    },
+    []
+  );
+
+  // Edge context menu: show the edge menu with flip/sign/confidence/delete.
+  const handleEdgeContextMenu: EdgeMouseHandler = useCallback(
+    (evt, edge) => {
+      evt.preventDefault();
+      evt.stopPropagation();
+      setSelectedEdgeId(edge.id);
+      setContextMenu({
+        type: "edge",
+        x: evt.clientX,
+        y: evt.clientY,
+        edgeId: edge.id,
+        sign: edge.data?.sign,
+        confidence: edge.data?.confidence,
+        onFlipEdge,
+        onCycleEdgeSign,
+        onToggleEdgeConfidence,
+        onDeleteEdge: (id) => {
+          onDeleteEdge(id);
+          setSelectedEdgeId(null);
+        },
+        onClose: closeContextMenu,
+      });
+    },
+    [onFlipEdge, onCycleEdgeSign, onToggleEdgeConfidence, onDeleteEdge, closeContextMenu]
+  );
+
+  // Edge update (re-point): drag an edge endpoint to a new node.
+  // React-flow v11 calls this handler when the user drops an edge endpoint onto
+  // a valid node. If the drop is on empty space, the handler is NOT called and
+  // the edge is kept as-is (v11 default behaviour — no silent unbind).
+  const handleEdgeUpdate = useCallback(
+    (oldEdge: Edge, newConnection: Connection) => {
+      if (newConnection.source && newConnection.target) {
+        onRepointEdge(oldEdge.id, {
+          source: newConnection.source,
+          target: newConnection.target,
+        });
+      }
+    },
+    [onRepointEdge]
+  );
+
+  // Pane click: deselect edge when clicking empty canvas.
+  const handlePaneClick = useCallback(() => {
+    setSelectedEdgeId(null);
+  }, []);
+
+  // Close context menu when the canvas pans or scrolls (react-flow onMove).
+  const handleMove = useCallback(() => {
+    if (contextMenu) setContextMenu(null);
+  }, [contextMenu]);
+
   const showHairballNotice = map.nodes.length > 20 && !selectedId;
   const showEmptyHint = map.nodes.length === 0;
+
+  // Compute EdgeToolbar position (screen coords) when an edge is selected.
+  // We use the two endpoint node RF positions to find the midpoint and convert
+  // to screen coordinates via flowToScreenPosition (available in react-flow v11
+  // via getViewport + manual transform, or by using the node DOM positions).
+  // Simplest approach in v11: get node positions from rfNodes and use the
+  // ReactFlow instance to convert via a direct calculation.
+  const selectedEdge = selectedEdgeId
+    ? map.edges.find((e) => e.id === selectedEdgeId)
+    : null;
+
+  const edgeToolbarPosition = (() => {
+    if (!selectedEdge) return null;
+    const srcNode = rfNodes.find((n) => n.id === selectedEdge.from);
+    const tgtNode = rfNodes.find((n) => n.id === selectedEdge.to);
+    if (!srcNode || !tgtNode) return null;
+    // Midpoint in flow coordinates, then convert to screen coordinates
+    const midFlowX = (srcNode.position.x + tgtNode.position.x) / 2;
+    const midFlowY = (srcNode.position.y + tgtNode.position.y) / 2;
+    // flowToScreenPosition gives us absolute screen coords, but we need
+    // coords relative to the wrapper div for the absolute overlay.
+    // Use flowToScreenPosition then subtract the wrapper's bounding rect.
+    const screenPos = flowToScreenPosition({ x: midFlowX, y: midFlowY });
+    const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+    if (!wrapperRect) return screenPos; // fallback to screen coords
+    return {
+      x: screenPos.x - wrapperRect.left,
+      y: screenPos.y - wrapperRect.top,
+    };
+  })();
 
   return (
     <div
@@ -642,6 +770,12 @@ function LayeredViewInner({
         onNodeMouseLeave={handleNodeMouseLeave}
         onNodeContextMenu={handleNodeContextMenu}
         onPaneContextMenu={handlePaneContextMenu}
+        onEdgeClick={handleEdgeClick}
+        onEdgeContextMenu={handleEdgeContextMenu}
+        onEdgeUpdate={handleEdgeUpdate}
+        onPaneClick={handlePaneClick}
+        onMove={handleMove}
+        edgesUpdatable={true}
         fitView
         fitViewOptions={{ padding: 0.2 }}
         proOptions={{ hideAttribution: true }}
@@ -658,6 +792,22 @@ function LayeredViewInner({
         <Background color="var(--paper-rule)" gap={24} size={1} />
         <Controls showInteractive={false} />
       </ReactFlow>
+
+      {/* Edge toolbar — appears when an edge is selected */}
+      {selectedEdge && edgeToolbarPosition && (
+        <EdgeToolbar
+          edgeId={selectedEdge.id}
+          sign={selectedEdge.sign}
+          confidence={selectedEdge.confidence}
+          x={edgeToolbarPosition.x}
+          y={edgeToolbarPosition.y}
+          onFlip={(id) => { onFlipEdge(id); }}
+          onCycleSign={(id) => { onCycleEdgeSign(id); }}
+          onToggleConfidence={(id) => { onToggleEdgeConfidence(id); }}
+          onDelete={(id) => { onDeleteEdge(id); setSelectedEdgeId(null); }}
+          onClose={() => { setSelectedEdgeId(null); wrapperRef.current?.focus(); }}
+        />
+      )}
 
       {/* Context menu overlay */}
       {contextMenu && <ContextMenu {...contextMenu} />}

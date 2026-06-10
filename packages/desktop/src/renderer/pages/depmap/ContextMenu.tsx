@@ -1,19 +1,19 @@
 /**
  * ContextMenu — fixed-position right-click menus for § IV Dependency Map.
  *
- * Renders two variants driven by the `type` discriminant:
+ * Renders three variants driven by the `type` discriminant:
  *   "node"  — Rename · Duplicate · Role ▸ · Delete
  *   "pane"  — Add node here · Tidy
+ *   "edge"  — Flip direction · Sign ▸ · Confidence ▸ · Delete
  *
  * Accessibility: role="menu" / role="menuitem"; focus moves to the first item
  * on open; ArrowUp/ArrowDown cycle through items; Enter activates the focused
  * item; Escape or click-away closes. Position is clamped to the viewport after
  * measuring the rendered menu.
- *
- * Extension point for Task 6: when `type === "edge"`, add edge-editing items.
  */
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import type { DependencyEdge } from "@decision-forge/core";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -42,7 +42,21 @@ export interface PaneContextMenuProps {
   onClose: () => void;
 }
 
-export type ContextMenuProps = NodeContextMenuProps | PaneContextMenuProps;
+export interface EdgeContextMenuProps {
+  type: "edge";
+  x: number;
+  y: number;
+  edgeId: string;
+  sign: DependencyEdge["sign"];
+  confidence: DependencyEdge["confidence"];
+  onFlipEdge: (id: string) => void;
+  onCycleEdgeSign: (id: string) => void;
+  onToggleEdgeConfidence: (id: string) => void;
+  onDeleteEdge: (id: string) => void;
+  onClose: () => void;
+}
+
+export type ContextMenuProps = NodeContextMenuProps | PaneContextMenuProps | EdgeContextMenuProps;
 
 // ---------------------------------------------------------------------------
 // Component
@@ -130,7 +144,9 @@ export function ContextMenu(props: ContextMenuProps) {
       {props.type === "pane" && (
         <PaneMenuItems {...props} />
       )}
-      {/* Extension point: add `props.type === "edge"` branch here in Task 6 */}
+      {props.type === "edge" && (
+        <EdgeMenuItems {...props} />
+      )}
     </div>
   );
 }
@@ -201,6 +217,48 @@ function PaneMenuItems(props: PaneContextMenuProps) {
       <MenuItem
         label="Tidy"
         onClick={() => { onTidy(); onClose(); }}
+      />
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Edge menu items (Task 6 extension point)
+// ---------------------------------------------------------------------------
+
+function EdgeMenuItems(props: EdgeContextMenuProps) {
+  const { edgeId, sign, confidence, onFlipEdge, onCycleEdgeSign, onToggleEdgeConfidence, onDeleteEdge, onClose } = props;
+
+  // Sign display labels
+  const signLabel = sign === "+" ? "+ amplifies" : sign === "-" ? "− dampens" : "none";
+  const nextSignLabel = sign === "+" ? "→ −" : sign === "-" ? "→ none" : "→ +";
+  const confLabel = confidence === "assumption" ? "assumption (dashed)" : "known (solid)";
+
+  return (
+    <>
+      <MenuItem
+        label="Flip direction"
+        onClick={() => { onFlipEdge(edgeId); onClose(); }}
+      />
+      <MenuDivider />
+      <MenuLabel label="Sign" />
+      <MenuItem
+        label={`Current: ${signLabel} ${nextSignLabel}`}
+        onClick={() => { onCycleEdgeSign(edgeId); onClose(); }}
+        indent
+      />
+      <MenuDivider />
+      <MenuLabel label="Confidence" />
+      <MenuItem
+        label={`Current: ${confLabel}`}
+        onClick={() => { onToggleEdgeConfidence(edgeId); onClose(); }}
+        indent
+      />
+      <MenuDivider />
+      <MenuItem
+        label="Delete"
+        onClick={() => { onDeleteEdge(edgeId); onClose(); }}
+        danger
       />
     </>
   );

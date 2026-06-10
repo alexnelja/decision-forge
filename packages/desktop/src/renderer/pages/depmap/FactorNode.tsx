@@ -62,6 +62,46 @@ const GLYPH: Partial<Record<string, string>> = {
 };
 
 // ---------------------------------------------------------------------------
+// Source handle definitions — generated from an array to avoid repetition.
+// Each entry describes one of the four invisible perimeter source handles.
+// ---------------------------------------------------------------------------
+
+const BASE_HANDLE_STYLE: React.CSSProperties = {
+  background: "transparent",
+  border: "none",
+  borderRadius: 0,
+  cursor: "crosshair",
+  opacity: 0,
+};
+
+const SOURCE_HANDLE_DEFS: Array<{
+  id: string;
+  position: Position;
+  style: React.CSSProperties;
+}> = [
+  {
+    id: "src-top",
+    position: Position.Top,
+    style: { ...BASE_HANDLE_STYLE, width: "calc(100% + 16px)", height: "8px", top: "-8px", left: "-8px" },
+  },
+  {
+    id: "src-right",
+    position: Position.Right,
+    style: { ...BASE_HANDLE_STYLE, width: "8px", height: "calc(100% + 16px)", right: "-8px", top: "-8px" },
+  },
+  {
+    id: "src-bottom",
+    position: Position.Bottom,
+    style: { ...BASE_HANDLE_STYLE, width: "calc(100% + 16px)", height: "8px", bottom: "-8px", left: "-8px" },
+  },
+  {
+    id: "src-left",
+    position: Position.Left,
+    style: { ...BASE_HANDLE_STYLE, width: "8px", height: "calc(100% + 16px)", left: "-8px", top: "-8px" },
+  },
+];
+
+// ---------------------------------------------------------------------------
 // FactorNode component
 // ---------------------------------------------------------------------------
 
@@ -196,70 +236,15 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
       {/* These handles are styled transparent; the cursor change to crosshair
           signals "drag from here to connect". react-flow positions them by
           Position enum; we overlay them with absolute CSS to span the full edge. */}
-      <Handle
-        type="source"
-        position={Position.Top}
-        id="src-top"
-        style={{
-          background: "transparent",
-          border: "none",
-          width: "calc(100% + 16px)",
-          height: "8px",
-          top: "-8px",
-          left: "-8px",
-          borderRadius: 0,
-          cursor: "crosshair",
-          opacity: 0,
-        }}
-      />
-      <Handle
-        type="source"
-        position={Position.Right}
-        id="src-right"
-        style={{
-          background: "transparent",
-          border: "none",
-          width: "8px",
-          height: "calc(100% + 16px)",
-          right: "-8px",
-          top: "-8px",
-          borderRadius: 0,
-          cursor: "crosshair",
-          opacity: 0,
-        }}
-      />
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        id="src-bottom"
-        style={{
-          background: "transparent",
-          border: "none",
-          width: "calc(100% + 16px)",
-          height: "8px",
-          bottom: "-8px",
-          left: "-8px",
-          borderRadius: 0,
-          cursor: "crosshair",
-          opacity: 0,
-        }}
-      />
-      <Handle
-        type="source"
-        position={Position.Left}
-        id="src-left"
-        style={{
-          background: "transparent",
-          border: "none",
-          width: "8px",
-          height: "calc(100% + 16px)",
-          left: "-8px",
-          top: "-8px",
-          borderRadius: 0,
-          cursor: "crosshair",
-          opacity: 0,
-        }}
-      />
+      {SOURCE_HANDLE_DEFS.map(({ position, id, style }) => (
+        <Handle
+          key={id}
+          type="source"
+          position={position}
+          id={id}
+          style={style}
+        />
+      ))}
 
       {/* ── Target handle: covers the full node body ── */}
       <Handle
