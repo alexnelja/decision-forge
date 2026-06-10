@@ -799,10 +799,11 @@ function LayeredViewInner({
         </div>
       )}
 
-      {/* Tidy button — explicit dagre relayout, does NOT fire on every render */}
+      {/* Tidy button — icon-only, explicit dagre relayout, does NOT fire on every render */}
       <button
         onClick={handleTidy}
         title="Re-run auto-layout (Tidy)"
+        aria-label="Tidy layout"
         style={{
           position: "absolute",
           top: 8,
@@ -812,13 +813,21 @@ function LayeredViewInner({
           color: "var(--ink-dim)",
           border: "1px solid var(--paper-rule)",
           borderRadius: "4px",
-          padding: "3px 8px",
-          fontSize: "11px",
+          padding: "5px",
           cursor: "pointer",
-          fontFamily: "var(--font-display, inherit)",
+          display: "inline-flex",
+          alignItems: "center",
+          justifyContent: "center",
+          lineHeight: 0,
         }}
       >
-        Tidy
+        {/* Grid/alignment (Tidy) icon */}
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+          <line x1="3" y1="4" x2="13" y2="4" />
+          <line x1="3" y1="8" x2="13" y2="8" />
+          <line x1="3" y1="12" x2="13" y2="12" />
+          <line x1="3" y1="3" x2="3" y2="13" />
+        </svg>
       </button>
 
       {/* Loop badge overlay — pointer-events-none floating labels at loop centroids */}

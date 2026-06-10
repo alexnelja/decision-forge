@@ -453,45 +453,73 @@ export default function DependencyMap() {
           }}
         />
 
-        {/* Persistence buttons */}
+        {/* Persistence buttons — icon-only with aria-label + title tooltips */}
         <button
           onClick={handleSave}
-          style={btnStyle}
+          style={iconBtnStyle}
           title="Save this map"
+          aria-label="Save map"
           data-testid="map-save"
         >
-          Save
+          {/* Floppy/down-tray save icon */}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <rect x="2" y="2" width="12" height="12" rx="1.5" />
+            <rect x="5" y="2" width="6" height="4" rx="0.5" />
+            <rect x="4.5" y="9" width="7" height="4.5" rx="0.5" />
+          </svg>
         </button>
         <button
           onClick={handleOpen}
-          style={btnStyle}
+          style={iconBtnStyle}
           title="Open a saved map"
+          aria-label="Open map"
         >
-          Open
+          {/* Folder open icon */}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <path d="M2 4.5C2 3.67 2.67 3 3.5 3H6l1.5 2H13c.83 0 1.5.67 1.5 1.5v5c0 .83-.67 1.5-1.5 1.5H3.5C2.67 13 2 12.33 2 11.5V4.5Z" />
+          </svg>
         </button>
         <button
           onClick={handleNew}
-          style={btnStyle}
+          style={iconBtnStyle}
           title="Start a new empty map"
+          aria-label="New map"
         >
-          New
+          {/* Plus icon */}
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+            <line x1="8" y1="3" x2="8" y2="13" />
+            <line x1="3" y1="8" x2="13" y2="8" />
+          </svg>
         </button>
 
-        {/* View-mode toggle */}
+        {/* View-mode toggle — icon-only with aria-label + title */}
         <div style={{ marginLeft: "auto", display: "flex", gap: "4px" }}>
           <button
             onClick={() => setViewMode("layered")}
-            style={viewMode === "layered" ? activeToggleStyle : toggleStyle}
+            style={viewMode === "layered" ? activeIconBtnStyle : iconToggleStyle}
             aria-pressed={viewMode === "layered"}
+            aria-label="Layered view"
+            title="Layered view — 2D DAG canvas"
           >
-            Layered
+            {/* Stacked layers icon */}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="M2 5.5L8 3l6 2.5L8 8 2 5.5Z" />
+              <path d="M2 8.5L8 6l6 2.5" opacity="0.5" />
+              <path d="M2 11.5L8 9l6 2.5" opacity="0.25" />
+            </svg>
           </button>
           <button
             onClick={() => setViewMode("3d")}
-            style={viewMode === "3d" ? activeToggleStyle : toggleStyle}
+            style={viewMode === "3d" ? activeIconBtnStyle : iconToggleStyle}
             aria-pressed={viewMode === "3d"}
+            aria-label="3D view"
+            title="3D constellation view"
           >
-            3D
+            {/* Cube icon */}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+              <path d="M8 2L14 5.5v5L8 14 2 10.5v-5L8 2Z" />
+              <path d="M8 2v12M2 5.5l6 3.5 6-3.5" />
+            </svg>
           </button>
         </div>
       </div>
@@ -706,6 +734,32 @@ const btnStyle: React.CSSProperties = {
   fontSize: "12px",
   cursor: "pointer",
   fontFamily: "var(--font-display, inherit)",
+};
+
+/** Icon-only button: square, same border/radius as btnStyle, centered 16px icon. */
+const iconBtnStyle: React.CSSProperties = {
+  background: "var(--paper-raised)",
+  color: "var(--ink)",
+  border: "1px solid var(--paper-rule)",
+  borderRadius: "4px",
+  padding: "5px",
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  lineHeight: 0,
+};
+
+const iconToggleStyle: React.CSSProperties = {
+  ...iconBtnStyle,
+  color: "var(--ink-dim)",
+};
+
+const activeIconBtnStyle: React.CSSProperties = {
+  ...iconBtnStyle,
+  background: "var(--sec-depmap)",
+  color: "#fff",
+  border: "1px solid var(--sec-depmap)",
 };
 
 const toggleStyle: React.CSSProperties = {

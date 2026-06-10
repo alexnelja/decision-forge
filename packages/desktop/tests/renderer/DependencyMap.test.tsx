@@ -1184,3 +1184,114 @@ describe("Role — selecting Factor removes the role key from the saved node", (
     expect("role" in saved.nodes[0]!).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Task 8: Icon chrome — header buttons use aria-label + title, no visible text
+// ---------------------------------------------------------------------------
+describe("Header icon buttons (Task 8)", () => {
+  it("Save button is found by aria-label 'Save map' with a title tooltip", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const btn = screen.getByRole("button", { name: "Save map" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveAttribute("title");
+    // Should contain no visible text — only an SVG/icon inside
+    expect(btn.textContent?.trim()).toBe("");
+  });
+
+  it("Open button is found by aria-label 'Open map' with a title tooltip", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const btn = screen.getByRole("button", { name: "Open map" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveAttribute("title");
+    expect(btn.textContent?.trim()).toBe("");
+  });
+
+  it("New button is found by aria-label 'New map' with a title tooltip", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const btn = screen.getByRole("button", { name: "New map" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveAttribute("title");
+    expect(btn.textContent?.trim()).toBe("");
+  });
+
+  it("Layered view toggle is found by aria-label 'Layered view' with a title tooltip", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const btn = screen.getByRole("button", { name: "Layered view" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveAttribute("title");
+    expect(btn.textContent?.trim()).toBe("");
+  });
+
+  it("3D view toggle is found by aria-label '3D view' with a title tooltip", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const btn = screen.getByRole("button", { name: "3D view" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveAttribute("title");
+    expect(btn.textContent?.trim()).toBe("");
+  });
+
+  it("Tidy layout button is found by aria-label 'Tidy layout' with a title tooltip", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const btn = screen.getByRole("button", { name: "Tidy layout" });
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveAttribute("title");
+    expect(btn.textContent?.trim()).toBe("");
+  });
+
+  it("Save button still triggers save when clicked", async () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const saveBtn = screen.getByRole("button", { name: "Save map" });
+    fireEvent.click(saveBtn);
+    await waitFor(() => {
+      expect((window as any).api.maps.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("Layered view toggle starts with aria-pressed=true", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const layeredBtn = screen.getByRole("button", { name: "Layered view" });
+    expect(layeredBtn).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("3D view toggle starts with aria-pressed=false", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const tdBtn = screen.getByRole("button", { name: "3D view" });
+    expect(tdBtn).toHaveAttribute("aria-pressed", "false");
+  });
+});
