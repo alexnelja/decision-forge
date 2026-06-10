@@ -1,4 +1,4 @@
-import { useState, lazy, Suspense } from "react";
+import { useState, useRef, lazy, Suspense } from "react";
 import { ModuleFrame } from "../components/ModuleFrame";
 import type { DependencyMap as DMap, DependencyEdge, DependencyNode } from "@decision-forge/core";
 import { CapturePanel } from "./depmap/CapturePanel";
@@ -30,6 +30,11 @@ export default function DependencyMap() {
   const [map, setMap] = useState<DMap>(makeEmpty);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  // Freshly created node ids (born via double-click-add or drag-to-empty) that
+  // have never been successfully named. Cancel-by-empty (committing an empty
+  // label) deletes ONLY these — an existing node committed empty keeps its
+  // previous label instead of being silently destroyed.
+  const freshNodeIds = useRef<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>("layered");
   // Collapsible capture sidebar: starts pinned open; unpin to get the thin rail.
   const [sidebarPinned, setSidebarPinned] = useState(true);
@@ -75,6 +80,7 @@ export default function DependencyMap() {
   }
 
   function handleDeleteNode(id: string) {
+    freshNodeIds.current.delete(id);
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.filter((n) => n.id !== id),
@@ -101,6 +107,7 @@ export default function DependencyMap() {
   function handleAddNodeAt(label: string, pos: { x: number; y: number }) {
     const newId = crypto.randomUUID();
     const now = new Date().toISOString();
+    freshNodeIds.current.add(newId);
     setMap((prev) => ({
       ...prev,
       nodes: [...prev.nodes, { id: newId, label: label || "New factor", position: pos }],
@@ -118,6 +125,7 @@ export default function DependencyMap() {
     const newId = crypto.randomUUID();
     const edgeId = crypto.randomUUID();
     const now = new Date().toISOString();
+    freshNodeIds.current.add(newId);
     setMap((prev) => {
       // Deduplicate: if a node already exists at that source, still add
       return {
@@ -160,17 +168,21 @@ export default function DependencyMap() {
   }
 
   /**
-   * Rename a node.
-   * If the node was freshly created (renamingId matches) and the label is empty,
-   * delete the node instead (cancel-by-empty).
+   * Rename a node. Empty-label commits are scoped:
+   *   - FRESH node (never successfully named): delete it (cancel-by-empty).
+   *   - EXISTING node: keep its previous label — just exit rename mode.
+   *     Never silently destroy user data on an accidental empty commit.
    */
   function handleRenameNode(id: string, label: string) {
     const trimmed = label.trim();
     if (!trimmed) {
-      // Cancel-by-empty: delete the fresh node
-      handleDeleteNode(id);
+      if (freshNodeIds.current.has(id)) {
+        handleDeleteNode(id); // also clears the fresh flag
+      }
+      setRenamingId(null); // existing node: snap back to previous label
       return;
     }
+    freshNodeIds.current.delete(id); // successfully named — no longer fresh
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) =>
@@ -254,6 +266,7 @@ export default function DependencyMap() {
     try {
       const loaded = await mapsApi.load(id);
       if (loaded) {
+        freshNodeIds.current.clear();
         setMap(loaded);
         setSelectedId(null);
       }
@@ -265,6 +278,7 @@ export default function DependencyMap() {
   }
 
   function handleNew() {
+    freshNodeIds.current.clear();
     setMap(makeEmpty());
     setSelectedId(null);
     setOpenList(null);

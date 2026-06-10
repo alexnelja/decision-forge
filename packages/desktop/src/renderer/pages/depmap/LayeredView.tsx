@@ -333,12 +333,14 @@ function LayeredViewInner({
       if (!didConnectRef.current && connectStartRef.current) {
         const { clientX, clientY } =
           "touches" in event ? event.changedTouches[0]! : event;
-        // Only create new node if dropped on the pane (not on an existing node)
+        // Only create new node if dropped on EMPTY pane — nodes render inside
+        // .react-flow__pane in v11, so exclude node targets explicitly.
         const target = event.target as Element;
+        const onNode = !!target?.closest?.(".react-flow__node");
         const onPane =
           target?.classList?.contains("react-flow__pane") ||
           !!target?.closest?.(".react-flow__pane");
-        if (onPane) {
+        if (onPane && !onNode) {
           const pos = screenToFlowPosition({ x: clientX, y: clientY });
           onAddConnectedNodeAt(connectStartRef.current, pos);
         }
@@ -403,15 +405,28 @@ function LayeredViewInner({
   // Double-click on empty pane → add node at that position in rename mode.
   // react-flow v11 has no onPaneDoubleClick prop — wire via onDoubleClick on
   // the wrapper div and guard with closest(".react-flow__pane").
+  // NOTE: in v11 the nodes container renders INSIDE .react-flow__pane, so the
+  // pane check alone also matches double-clicks on nodes — exclude node
+  // targets explicitly (node double-click = rename, see handleNodeDoubleClick).
   const handleWrapperDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       const target = e.target as Element;
+      if (target?.closest?.(".react-flow__node")) return; // node dbl-click = rename
       if (!target?.closest?.(".react-flow__pane")) return;
       e.preventDefault();
       const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       onAddNodeAt("", pos);
     },
     [onAddNodeAt, screenToFlowPosition]
+  );
+
+  // Double-click on a node → inline rename of that node.
+  const handleNodeDoubleClick: NodeMouseHandler = useCallback(
+    (evt, node) => {
+      evt.preventDefault();
+      onStartRename(node.id);
+    },
+    [onStartRename]
   );
 
   // ⌘D / Ctrl-D: duplicate selected node
@@ -455,7 +470,10 @@ function LayeredViewInner({
   const handleWrapperContextMenu = useCallback(
     (evt: React.MouseEvent) => {
       const target = evt.target as Element;
-      // Only show pane menu when clicking on the pane itself, not on a node
+      // Only show pane menu when clicking on the pane itself, not on a node —
+      // nodes render INSIDE .react-flow__pane in v11, so exclude them first or
+      // the bubbled event overwrites the node menu set by onNodeContextMenu.
+      if (target?.closest?.(".react-flow__node")) return;
       const onPane =
         target?.classList?.contains("react-flow__pane") ||
         !!target?.closest?.(".react-flow__pane");
@@ -581,6 +599,7 @@ function LayeredViewInner({
         onConnectStart={handleConnectStart}
         onConnectEnd={handleConnectEnd}
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onNodeDragStop={handleNodeDragStop}
         onNodesDelete={handleNodesDelete}
         onEdgesDelete={handleEdgesDelete}

@@ -473,6 +473,82 @@ describe("DependencyMap — duplicate / rename / role handlers", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Cancel-by-empty rename scoping: empty commit deletes FRESH nodes only.
+// Existing nodes snap back to their previous label (no data loss).
+// ---------------------------------------------------------------------------
+describe("Rename — cancel-by-empty scoping", () => {
+  it("fresh node (double-click pane) + empty label + Enter → node is removed", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    // Double-click the empty pane → new node in rename mode
+    const pane = container.querySelector(".react-flow__pane")!;
+    fireEvent.doubleClick(pane);
+
+    // Rename input appears inside the canvas node
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).toBeInTheDocument();
+    });
+
+    // Clear the label and commit
+    const renameInput = container.querySelector(".react-flow__node input")!;
+    fireEvent.change(renameInput, { target: { value: "" } });
+    fireEvent.keyDown(renameInput, { key: "Enter" });
+
+    // The fresh node is deleted (cancel-by-empty)
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(0);
+    });
+  });
+
+  it("EXISTING node: double-click → clear input → Enter → node survives with original label", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    // Add an existing node via the CapturePanel
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "KeepMe" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    });
+
+    // Double-click the node itself → inline rename mode (NOT a new node)
+    const node = container.querySelector(".react-flow__node")!;
+    fireEvent.doubleClick(node);
+
+    await waitFor(() => {
+      const renameInput = container.querySelector(
+        ".react-flow__node input"
+      ) as HTMLInputElement | null;
+      expect(renameInput).toBeInTheDocument();
+      expect(renameInput!.value).toBe("KeepMe");
+    });
+    // Double-clicking a node must NOT have created a second node
+    expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+
+    // Clear the label and commit — existing node must NOT be deleted
+    const renameInput = container.querySelector(".react-flow__node input")!;
+    fireEvent.change(renameInput, { target: { value: "" } });
+    fireEvent.keyDown(renameInput, { key: "Enter" });
+
+    // Node survives with its ORIGINAL label (rename mode exits, label snaps back)
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+      expect(container.querySelector(".react-flow__node input")).not.toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "KeepMe" })).toBeInTheDocument(); // CapturePanel list
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Context menu
 // ---------------------------------------------------------------------------
 describe("ContextMenu — pane right-click shows Add node here", () => {
