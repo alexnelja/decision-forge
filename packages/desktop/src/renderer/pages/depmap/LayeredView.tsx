@@ -323,8 +323,15 @@ function LayeredViewInner({
 
   const handleTidy = useCallback(() => {
     const positions = layoutPositions(map.nodes, map.edges);
+    setRfNodes((nds) =>
+      nds.map((n) => {
+        const pos = positions.get(n.id);
+        return pos ? { ...n, position: pos } : n;
+      })
+    );
     onRelayout(positions);
-  }, [map.nodes, map.edges, onRelayout]);
+    setTimeout(() => fitView({ padding: 0.2 }), 50);
+  }, [map.nodes, map.edges, onRelayout, setRfNodes, fitView]);
 
   const showHairballNotice = map.nodes.length > 20 && !selectedId;
 
