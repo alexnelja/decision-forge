@@ -18,6 +18,13 @@
   --sec-nego: #e8582b;
   --sec-forecast: #6fa88a;
   --sec-depmap: #8f7ae6;
+
+  /* Edge polarity tokens (Task 6) */
+  --plus: #6fa88a;
+  --minus: #e8582b;
+
+  /* Shared rule token (used by some components directly) */
+  --paper-rule: #2a2620;
 }
 
 html, body, #root { height: 100%; margin: 0; }
