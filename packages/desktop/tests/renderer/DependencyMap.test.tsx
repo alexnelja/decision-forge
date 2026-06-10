@@ -546,6 +546,66 @@ describe("Rename — cancel-by-empty scoping", () => {
     });
     expect(screen.getByRole("button", { name: "KeepMe" })).toBeInTheDocument(); // CapturePanel list
   });
+
+  it("fresh node (double-click pane) + Esc → node is removed (never mind)", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    // Double-click the empty pane → new node in rename mode
+    const pane = container.querySelector(".react-flow__pane")!;
+    fireEvent.doubleClick(pane);
+
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).toBeInTheDocument();
+    });
+
+    // Esc during initial naming = "never mind" → fresh node removed
+    const renameInput = container.querySelector(".react-flow__node input")!;
+    fireEvent.keyDown(renameInput, { key: "Escape" });
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(0);
+    });
+  });
+
+  it("EXISTING node: double-click → Esc → node survives with original label", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    // Add an existing node via the CapturePanel
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "Survivor" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    });
+
+    // Enter rename mode via double-click on the node, type a draft, then Esc
+    const node = container.querySelector(".react-flow__node")!;
+    fireEvent.doubleClick(node);
+
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).toBeInTheDocument();
+    });
+
+    const renameInput = container.querySelector(".react-flow__node input")!;
+    fireEvent.change(renameInput, { target: { value: "discarded draft" } });
+    fireEvent.keyDown(renameInput, { key: "Escape" });
+
+    // Node survives, rename mode exits, original label intact
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).not.toBeInTheDocument();
+    });
+    expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    expect(screen.getByRole("button", { name: "Survivor" })).toBeInTheDocument();
+  });
 });
 
 // ---------------------------------------------------------------------------

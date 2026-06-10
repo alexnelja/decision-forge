@@ -193,10 +193,16 @@ export default function DependencyMap() {
     setRenamingId(null);
   }
 
-  /** Cancel rename (Esc key). Does NOT delete the node — only clears rename mode. */
+  /**
+   * Cancel rename (Esc key).
+   *   - FRESH node (never successfully named): Esc during initial naming means
+   *     "never mind" — remove the node (FigJam/Obsidian-canvas pattern).
+   *   - EXISTING node: keep it, just exit rename mode (label unchanged).
+   */
   function handleCancelRename(id: string) {
-    // If the node was freshly created and user presses Esc, keep it with "New factor".
-    void id; // id not used but kept for API symmetry
+    if (freshNodeIds.current.has(id)) {
+      handleDeleteNode(id); // also clears the fresh flag
+    }
     setRenamingId(null);
   }
 
