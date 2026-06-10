@@ -71,6 +71,21 @@ function directNeighbours(map: DependencyMap, nodeId: string): Set<string> {
 }
 
 /**
+ * Returns true when the event target is the empty react-flow pane (not on a
+ * node).  In react-flow v11 nodes render inside .react-flow__pane, so we must
+ * exclude node targets before checking for the pane.
+ */
+function isEmptyPaneTarget(target: EventTarget | null): boolean {
+  const el = target as Element | null;
+  if (!el) return false;
+  if (el.closest?.(".react-flow__node")) return false;
+  return (
+    el.classList?.contains("react-flow__pane") ||
+    !!el.closest?.(".react-flow__pane")
+  );
+}
+
+/**
  * Compute a string that captures the STRUCTURAL identity of the map —
  * sorted node-ids + sorted edge-ids.  Used as a useEffect dependency so
  * the position-sync fires only when topology changes (add/delete/load),
@@ -170,6 +185,11 @@ function LayeredViewInner({
   //   - calling fitView after a fresh load or tidy
   // This effect NEVER touches styles — it sets the minimal node object so that
   // the style effect below can paint over it without losing position data.
+  //
+  // The prevStructKey early-return guarantees the effect body only runs when
+  // topology truly changed, even if the deps array includes stable-but-changing
+  // values.  This lets us list all real deps for the linter without altering
+  // the semantics of the guard.
   const structKey = structuralKey(map);
   useEffect(() => {
     if (structKey === prevStructKey.current) return; // topology unchanged
@@ -230,7 +250,7 @@ function LayeredViewInner({
     // Fit view after a topology change (load or add/delete nodes).
     // Small timeout lets RF finish painting the new nodes before measuring.
     scheduleFitView();
-  }, [structKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [structKey, onRenameNode, onCancelRename, duplicateNode, onDeleteNode, scheduleFitView]);
 
   // ── Effect 2: STYLE SYNC ────────────────────────────────────────────────
   // Fires when visual state changes (selection, hover, analysis, renamingId).
@@ -251,6 +271,9 @@ function LayeredViewInner({
     const hoverNeighbours =
       hoveredId && !selectedId ? directNeighbours(map, hoveredId) : null;
 
+    // O(1) lookup by id instead of O(n) find() inside the per-node loop.
+    const mapNodeById = new Map(map.nodes.map((n) => [n.id, n]));
+
     setRfNodes((nds) =>
       nds.map((n) => {
         const id = n.id;
@@ -268,7 +291,7 @@ function LayeredViewInner({
           if (id !== hoveredId && !hoverNeighbours.has(id)) dimOpacity = 0.25;
         }
 
-        const mapNode = map.nodes.find((mn) => mn.id === id);
+        const mapNode = mapNodeById.get(id);
 
         return {
           ...n,
@@ -330,7 +353,7 @@ function LayeredViewInner({
         };
       })
     );
-  }, [analysis, selectedId, hoveredId, map, renamingId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [analysis, selectedId, hoveredId, map, renamingId, onRenameNode, onCancelRename, duplicateNode, onDeleteNode]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
@@ -357,14 +380,7 @@ function LayeredViewInner({
       if (!didConnectRef.current && connectStartRef.current) {
         const { clientX, clientY } =
           "touches" in event ? event.changedTouches[0]! : event;
-        // Only create new node if dropped on EMPTY pane — nodes render inside
-        // .react-flow__pane in v11, so exclude node targets explicitly.
-        const target = event.target as Element;
-        const onNode = !!target?.closest?.(".react-flow__node");
-        const onPane =
-          target?.classList?.contains("react-flow__pane") ||
-          !!target?.closest?.(".react-flow__pane");
-        if (onPane && !onNode) {
+        if (isEmptyPaneTarget(event.target)) {
           const pos = screenToFlowPosition({ x: clientX, y: clientY });
           onAddConnectedNodeAt(connectStartRef.current, pos);
         }
@@ -434,9 +450,7 @@ function LayeredViewInner({
   // targets explicitly (node double-click = rename, see handleNodeDoubleClick).
   const handleWrapperDoubleClick = useCallback(
     (e: React.MouseEvent) => {
-      const target = e.target as Element;
-      if (target?.closest?.(".react-flow__node")) return; // node dbl-click = rename
-      if (!target?.closest?.(".react-flow__pane")) return;
+      if (!isEmptyPaneTarget(e.target)) return;
       e.preventDefault();
       const pos = screenToFlowPosition({ x: e.clientX, y: e.clientY });
       onAddNodeAt("", pos);
@@ -472,8 +486,8 @@ function LayeredViewInner({
       evt.preventDefault();
       setContextMenu({
         type: "node",
-        x: (evt as unknown as MouseEvent).clientX,
-        y: (evt as unknown as MouseEvent).clientY,
+        x: evt.clientX,
+        y: evt.clientY,
         nodeId: node.id,
         onRename: (id) => {
           onSelect(id);
@@ -493,15 +507,10 @@ function LayeredViewInner({
   // when right-click pan is enabled (it prevents default and doesn't call the prop).
   const handleWrapperContextMenu = useCallback(
     (evt: React.MouseEvent) => {
-      const target = evt.target as Element;
       // Only show pane menu when clicking on the pane itself, not on a node —
       // nodes render INSIDE .react-flow__pane in v11, so exclude them first or
       // the bubbled event overwrites the node menu set by onNodeContextMenu.
-      if (target?.closest?.(".react-flow__node")) return;
-      const onPane =
-        target?.classList?.contains("react-flow__pane") ||
-        !!target?.closest?.(".react-flow__pane");
-      if (!onPane) return;
+      if (!isEmptyPaneTarget(evt.target)) return;
       evt.preventDefault();
       const flowPos = screenToFlowPosition({
         x: evt.clientX,

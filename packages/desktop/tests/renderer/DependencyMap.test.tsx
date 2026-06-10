@@ -609,6 +609,51 @@ describe("Rename — cancel-by-empty scoping", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Same-label rename is a no-op (does not bump updatedAt, exits rename mode)
+// ---------------------------------------------------------------------------
+describe("Rename — same-label commit is a no-op", () => {
+  it("committing the same label exits rename mode and keeps the node", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    // Add an existing node via the CapturePanel
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "SameLabel" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    });
+
+    // Enter rename mode via double-click
+    const node = container.querySelector(".react-flow__node")!;
+    fireEvent.doubleClick(node);
+
+    await waitFor(() => {
+      const renameInput = container.querySelector(
+        ".react-flow__node input"
+      ) as HTMLInputElement | null;
+      expect(renameInput).toBeInTheDocument();
+      expect(renameInput!.value).toBe("SameLabel");
+    });
+
+    // Commit with the SAME label (no change)
+    const renameInput = container.querySelector(".react-flow__node input")!;
+    fireEvent.keyDown(renameInput, { key: "Enter" });
+
+    // Rename mode exits, node survives with its label intact
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).not.toBeInTheDocument();
+    });
+    expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    expect(screen.getByRole("button", { name: "SameLabel" })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Context menu
 // ---------------------------------------------------------------------------
 describe("ContextMenu — pane right-click shows Add node here", () => {

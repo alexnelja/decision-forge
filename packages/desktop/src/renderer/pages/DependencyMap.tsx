@@ -1,4 +1,4 @@
-import { useState, useRef, lazy, Suspense } from "react";
+import { useState, useRef, useCallback, lazy, Suspense } from "react";
 import { ModuleFrame } from "../components/ModuleFrame";
 import type { DependencyMap as DMap, DependencyEdge, DependencyNode } from "@decision-forge/core";
 import { CapturePanel } from "./depmap/CapturePanel";
@@ -47,16 +47,16 @@ export default function DependencyMap() {
   // Compute analysis ONCE here and pass down to both LayeredView and StructurePanel.
   const analysis = useAnalysis(map);
 
-  function handleAddNode(label: string) {
+  const handleAddNode = useCallback((label: string) => {
     const now = new Date().toISOString();
     setMap((prev) => ({
       ...prev,
       nodes: [...prev.nodes, { id: crypto.randomUUID(), label }],
       updatedAt: now,
     }));
-  }
+  }, []);
 
-  function handleAddEdge(from: string, to: string) {
+  const handleAddEdge = useCallback((from: string, to: string) => {
     if (from === to) return;
     setMap((prev) => {
       if (prev.edges.some((e) => e.from === from && e.to === to)) return prev;
@@ -67,9 +67,9 @@ export default function DependencyMap() {
         updatedAt: new Date().toISOString(),
       };
     });
-  }
+  }, []);
 
-  function handleUpdateNodePosition(id: string, pos: { x: number; y: number }) {
+  const handleUpdateNodePosition = useCallback((id: string, pos: { x: number; y: number }) => {
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) =>
@@ -77,9 +77,9 @@ export default function DependencyMap() {
       ),
       updatedAt: new Date().toISOString(),
     }));
-  }
+  }, []);
 
-  function handleDeleteNode(id: string) {
+  const handleDeleteNode = useCallback((id: string) => {
     freshNodeIds.current.delete(id);
     setMap((prev) => ({
       ...prev,
@@ -88,15 +88,15 @@ export default function DependencyMap() {
       updatedAt: new Date().toISOString(),
     }));
     setSelectedId((prev) => (prev === id ? null : prev));
-  }
+  }, []);
 
-  function handleDeleteEdge(id: string) {
+  const handleDeleteEdge = useCallback((id: string) => {
     setMap((prev) => ({
       ...prev,
       edges: prev.edges.filter((e) => e.id !== id),
       updatedAt: new Date().toISOString(),
     }));
-  }
+  }, []);
 
   // ── Task 5 handlers ─────────────────────────────────────────────────────
 
@@ -104,7 +104,7 @@ export default function DependencyMap() {
    * Add a node at a specific canvas position.
    * Passing an empty label immediately puts the node into rename mode.
    */
-  function handleAddNodeAt(label: string, pos: { x: number; y: number }) {
+  const handleAddNodeAt = useCallback((label: string, pos: { x: number; y: number }) => {
     const newId = crypto.randomUUID();
     const now = new Date().toISOString();
     freshNodeIds.current.add(newId);
@@ -115,32 +115,26 @@ export default function DependencyMap() {
     }));
     setSelectedId(newId);
     setRenamingId(newId);
-  }
+  }, []);
 
   /**
    * Add a new node connected FROM sourceId at a specific canvas position.
    * Both node creation and edge creation happen in a single state update.
    */
-  function handleAddConnectedNodeAt(sourceId: string, pos: { x: number; y: number }) {
+  const handleAddConnectedNodeAt = useCallback((sourceId: string, pos: { x: number; y: number }) => {
     const newId = crypto.randomUUID();
     const edgeId = crypto.randomUUID();
     const now = new Date().toISOString();
     freshNodeIds.current.add(newId);
-    setMap((prev) => {
-      // Deduplicate: if a node already exists at that source, still add
-      return {
-        ...prev,
-        nodes: [...prev.nodes, { id: newId, label: "New factor", position: pos }],
-        edges: [
-          ...prev.edges,
-          { id: edgeId, from: sourceId, to: newId } as DependencyEdge,
-        ],
-        updatedAt: now,
-      };
-    });
+    setMap((prev) => ({
+      ...prev,
+      nodes: [...prev.nodes, { id: newId, label: "New factor", position: pos }],
+      edges: [...prev.edges, { id: edgeId, from: sourceId, to: newId }],
+      updatedAt: now,
+    }));
     setSelectedId(newId);
     setRenamingId(newId);
-  }
+  }, []);
 
   /**
    * Duplicate a node: clone label + role, append " (copy)", offset position +24/+24.
@@ -148,54 +142,72 @@ export default function DependencyMap() {
    * from react-flow state — schema position alone is absent for nodes added via
    * the CapturePanel and never dragged, which would land every copy at {24,24}.
    */
-  function handleDuplicateNode(id: string, sourcePos?: { x: number; y: number }) {
-    const src = map.nodes.find((n) => n.id === id);
-    if (!src) return;
+  const handleDuplicateNode = useCallback((id: string, sourcePos?: { x: number; y: number }) => {
     const newId = crypto.randomUUID();
-    const base = sourcePos ?? src.position;
-    const pos = base
-      ? { x: base.x + 24, y: base.y + 24 }
-      : { x: 24, y: 24 };
-    const newNode: DependencyNode = {
-      id: newId,
-      label: `${src.label} (copy)`,
-      position: pos,
-      ...(src.role ? { role: src.role } : {}),
-    };
-    const now = new Date().toISOString();
-    setMap((prev) => ({
-      ...prev,
-      nodes: [...prev.nodes, newNode],
-      updatedAt: now,
-    }));
+    setMap((prev) => {
+      const src = prev.nodes.find((n) => n.id === id);
+      if (!src) return prev;
+      const base = sourcePos ?? src.position;
+      const pos = base
+        ? { x: base.x + 24, y: base.y + 24 }
+        : { x: 24, y: 24 };
+      const newNode: DependencyNode = {
+        id: newId,
+        label: `${src.label} (copy)`,
+        position: pos,
+        ...(src.role ? { role: src.role } : {}),
+      };
+      return {
+        ...prev,
+        nodes: [...prev.nodes, newNode],
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    // setSelectedId with the new id; if the source didn't exist (setMap returned
+    // prev unchanged), the phantom id is harmless — no node inspector shows.
     setSelectedId(newId);
-  }
+  }, []);
 
   /**
    * Rename a node. Empty-label commits are scoped:
    *   - FRESH node (never successfully named): delete it (cancel-by-empty).
    *   - EXISTING node: keep its previous label — just exit rename mode.
    *     Never silently destroy user data on an accidental empty commit.
+   * Same-label commits are no-ops: if the trimmed label equals the current
+   * label, exit rename mode without bumping updatedAt.
    */
-  function handleRenameNode(id: string, label: string) {
+  const handleRenameNode = useCallback((id: string, label: string) => {
     const trimmed = label.trim();
     if (!trimmed) {
       if (freshNodeIds.current.has(id)) {
-        handleDeleteNode(id); // also clears the fresh flag
+        // Delete fresh node (inline to avoid stale handleDeleteNode dep)
+        freshNodeIds.current.delete(id);
+        setMap((prev) => ({
+          ...prev,
+          nodes: prev.nodes.filter((n) => n.id !== id),
+          edges: prev.edges.filter((e) => e.from !== id && e.to !== id),
+          updatedAt: new Date().toISOString(),
+        }));
+        setSelectedId((prev) => (prev === id ? null : prev));
       }
       setRenamingId(null); // existing node: snap back to previous label
       return;
     }
     freshNodeIds.current.delete(id); // successfully named — no longer fresh
-    setMap((prev) => ({
-      ...prev,
-      nodes: prev.nodes.map((n) =>
-        n.id === id ? { ...n, label: trimmed } : n
-      ),
-      updatedAt: new Date().toISOString(),
-    }));
+    setMap((prev) => {
+      const existing = prev.nodes.find((n) => n.id === id);
+      // Same-label commit: exit rename mode without bumping updatedAt
+      if (existing && existing.label === trimmed) return prev;
+      return {
+        ...prev,
+        nodes: prev.nodes.map((n) =>
+          n.id === id ? { ...n, label: trimmed } : n
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    });
     setRenamingId(null);
-  }
+  }, []);
 
   /**
    * Cancel rename (Esc key).
@@ -203,34 +215,42 @@ export default function DependencyMap() {
    *     "never mind" — remove the node (FigJam/Obsidian-canvas pattern).
    *   - EXISTING node: keep it, just exit rename mode (label unchanged).
    */
-  function handleCancelRename(id: string) {
+  const handleCancelRename = useCallback((id: string) => {
     if (freshNodeIds.current.has(id)) {
-      handleDeleteNode(id); // also clears the fresh flag
+      // Inline the delete to avoid depending on handleDeleteNode callback
+      freshNodeIds.current.delete(id);
+      setMap((prev) => ({
+        ...prev,
+        nodes: prev.nodes.filter((n) => n.id !== id),
+        edges: prev.edges.filter((e) => e.from !== id && e.to !== id),
+        updatedAt: new Date().toISOString(),
+      }));
+      setSelectedId((prev) => (prev === id ? null : prev));
     }
     setRenamingId(null);
-  }
+  }, []);
 
   /** Enter rename mode for an existing node (e.g. from context menu Rename item). */
-  function handleStartRename(id: string) {
+  const handleStartRename = useCallback((id: string) => {
     setSelectedId(id);
     setRenamingId(id);
-  }
+  }, []);
 
   /**
    * Set the role of a node.
    */
-  function handleSetRole(
+  const handleSetRole = useCallback((
     id: string,
     role: "objective" | "lever" | "uncertainty" | "factor"
-  ) {
+  ) => {
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => (n.id === id ? { ...n, role } : n)),
       updatedAt: new Date().toISOString(),
     }));
-  }
+  }, []);
 
-  function handleUpdateNode(id: string, patch: { label?: string; note?: string }) {
+  const handleUpdateNode = useCallback((id: string, patch: { label?: string; note?: string }) => {
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) =>
@@ -238,9 +258,9 @@ export default function DependencyMap() {
       ),
       updatedAt: new Date().toISOString(),
     }));
-  }
+  }, []);
 
-  function handleRelayout(positions: Map<string, { x: number; y: number }>) {
+  const handleRelayout = useCallback((positions: Map<string, { x: number; y: number }>) => {
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => {
@@ -249,7 +269,7 @@ export default function DependencyMap() {
       }),
       updatedAt: new Date().toISOString(),
     }));
-  }
+  }, []);
 
   // --- persistence handlers -------------------------------------------------
 
