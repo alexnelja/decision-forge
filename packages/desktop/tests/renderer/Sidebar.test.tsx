@@ -63,27 +63,33 @@ describe("Sidebar — default pinned state", () => {
 });
 
 describe("Sidebar — unpin collapses to rail", () => {
-  it("unpin button is present", () => {
+  it("unpin button is present with an accessible name (aria-label)", () => {
     renderSidebar();
-    // Pin toggle button (● when pinned)
-    const pinBtn = screen.getByTitle(/unpin sidebar/i);
+    // Pin toggle button (● when pinned) — must be announced by name, not
+    // "black circle, button"
+    const pinBtn = screen.getByRole("button", { name: "Unpin sidebar" });
     expect(pinBtn).toBeInTheDocument();
+    expect(pinBtn).toHaveAttribute("title", "Unpin sidebar");
   });
 
-  it("after unpin, nav links are hidden (aria-hidden or display:none pattern)", () => {
+  it("after unpin (and mouse leave), nav links are hidden", () => {
     const { container } = renderSidebar();
-    const pinBtn = screen.getByTitle(/unpin sidebar/i);
+    const pinBtn = screen.getByRole("button", { name: "Unpin sidebar" });
     fireEvent.click(pinBtn);
+    // Ensure no lingering hover state keeps the panel open
+    const sidebarEl = container.querySelector("nav");
+    if (sidebarEl) fireEvent.mouseLeave(sidebarEl);
 
-    // Nav links should not be visible (they're inside the collapsed area)
-    // The links should no longer be in the document or should be hidden
-    const linksAfterCollapse = container.querySelectorAll("a[href]");
-    // When collapsed, links are not rendered (display toggle pattern)
-    const visibleLinks = Array.from(linksAfterCollapse).filter(
-      (el) => !(el as HTMLElement).closest("[data-sidebar-collapsed-links]")
-    );
-    // The "collapsed" label should appear
+    // When collapsed, nav links are not rendered at all
+    expect(container.querySelectorAll("a[href]").length).toBe(0);
+    // The collapsed rail still shows the vertical "Contents" label
     expect(screen.getByText(/contents/i)).toBeInTheDocument();
+  });
+
+  it("collapsed pin button has the accessible name 'Pin sidebar open'", () => {
+    localStorage.setItem("df.sidebar.pinned", "false");
+    renderSidebar();
+    expect(screen.getByRole("button", { name: "Pin sidebar open" })).toBeInTheDocument();
   });
 
   it("after unpin, a vertical 'Contents' label appears in the rail", () => {

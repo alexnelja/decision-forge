@@ -1295,3 +1295,76 @@ describe("Header icon buttons (Task 8)", () => {
     expect(tdBtn).toHaveAttribute("aria-pressed", "false");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Capture-panel pin — a11y name + localStorage persistence parity with the
+// global Contents nav ("df.capture.pinned", same lazy-init pattern).
+// ---------------------------------------------------------------------------
+describe("Capture-panel pin — aria-label + persistence", () => {
+  // localStorage mock — jsdom in this env does not provide localStorage.
+  const store: Record<string, string> = {};
+  const localStorageMock = {
+    getItem: (key: string): string | null => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
+  };
+
+  beforeEach(() => {
+    Object.defineProperty(globalThis, "localStorage", {
+      value: localStorageMock,
+      configurable: true,
+      writable: true,
+    });
+    localStorageMock.clear();
+  });
+
+  afterEach(() => {
+    localStorageMock.clear();
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
+
+  it("pin button is found by aria-label 'Unpin capture panel' (default pinned)", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const pinBtn = screen.getByRole("button", { name: "Unpin capture panel" });
+    expect(pinBtn).toBeInTheDocument();
+    expect(pinBtn).toHaveAttribute("title", "Unpin capture panel");
+  });
+
+  it("localStorage key = 'false' → capture panel starts collapsed", () => {
+    localStorageMock.setItem("df.capture.pinned", "false");
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    // Collapsed: the CapturePanel (and its add-a-factor input) is not rendered
+    expect(screen.queryByPlaceholderText(/add a factor/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pin capture panel open" })).toBeInTheDocument();
+  });
+
+  it("unpinning writes 'false' to localStorage('df.capture.pinned')", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Unpin capture panel" }));
+    expect(localStorageMock.getItem("df.capture.pinned")).toBe("false");
+  });
+
+  it("pinning writes 'true' to localStorage('df.capture.pinned')", () => {
+    localStorageMock.setItem("df.capture.pinned", "false");
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Pin capture panel open" }));
+    expect(localStorageMock.getItem("df.capture.pinned")).toBe("true");
+  });
+});

@@ -28,6 +28,22 @@ function makeEmpty(): DMap {
   };
 }
 
+/**
+ * Read the capture-panel pinned preference from localStorage. Same lazy-init
+ * try/catch pattern as the global Sidebar ("df.sidebar.pinned") so the two
+ * identical pin controls behave consistently across restarts. Defaults to
+ * true (pinned) when the key is absent or localStorage is unavailable.
+ */
+function readCapturePinned(): boolean {
+  try {
+    const stored = localStorage.getItem("df.capture.pinned");
+    if (stored === null) return true; // default: pinned
+    return stored !== "false";
+  } catch {
+    return true;
+  }
+}
+
 export default function DependencyMap() {
   const [map, setMap] = useState<DMap>(makeEmpty);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -38,10 +54,24 @@ export default function DependencyMap() {
   // previous label instead of being silently destroyed.
   const freshNodeIds = useRef<Set<string>>(new Set());
   const [viewMode, setViewMode] = useState<ViewMode>("layered");
-  // Collapsible capture sidebar: starts pinned open; unpin to get the thin rail.
-  const [sidebarPinned, setSidebarPinned] = useState(true);
+  // Collapsible capture sidebar: pinned by default; unpin to get the thin rail.
+  // Pin state persists to localStorage("df.capture.pinned") — parity with the
+  // global Contents nav's "df.sidebar.pinned".
+  const [sidebarPinned, setSidebarPinned] = useState<boolean>(() => readCapturePinned());
   const [sidebarHovered, setSidebarHovered] = useState(false);
   const sidebarOpen = sidebarPinned || sidebarHovered;
+
+  const toggleCapturePinned = useCallback(() => {
+    setSidebarPinned((p) => {
+      const next = !p;
+      try {
+        localStorage.setItem("df.capture.pinned", String(next));
+      } catch {
+        // localStorage may be unavailable in some contexts — ignore
+      }
+      return next;
+    });
+  }, []);
 
   // Open-dialog state: null = closed, array = list of maps available to load
   const [openList, setOpenList] = useState<Array<{ id: string; name: string }> | null>(null);
@@ -622,10 +652,13 @@ export default function DependencyMap() {
             </div>
           )}
 
-          {/* Pin/unpin toggle — always visible */}
+          {/* Pin/unpin toggle — always visible. Named "capture panel" (not
+              "sidebar") so its accessible name never collides with the global
+              Contents nav pin when both are on screen. */}
           <button
-            onClick={() => setSidebarPinned((p) => !p)}
-            title={sidebarPinned ? "Unpin sidebar" : "Pin sidebar open"}
+            onClick={toggleCapturePinned}
+            title={sidebarPinned ? "Unpin capture panel" : "Pin capture panel open"}
+            aria-label={sidebarPinned ? "Unpin capture panel" : "Pin capture panel open"}
             style={{
               position: "absolute",
               top: "6px",
@@ -637,7 +670,7 @@ export default function DependencyMap() {
               borderRadius: "3px",
               color: sidebarPinned ? "#fff" : "var(--ink-dim)",
               fontSize: "9px",
-              padding: "2px 4px",
+              padding: "8px", // ≥24px hit target (9px glyph + 2×8px padding)
               cursor: "pointer",
               lineHeight: 1,
               transition: "background 0.15s, color 0.15s",

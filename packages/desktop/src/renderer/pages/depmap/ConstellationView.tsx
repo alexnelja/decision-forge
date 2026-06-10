@@ -87,7 +87,7 @@ export default function ConstellationView({
     };
   }, [selectedId, graphInput]);
 
-  // Build edge sign lookup: edgeId → sign
+  // Build edge sign lookup: "from::to" → sign
   const edgeSignMap = useMemo(() => {
     const m = new Map<string, string | undefined>();
     for (const e of map.edges) {
@@ -102,7 +102,7 @@ export default function ConstellationView({
 
   const graphData = useMemo(() => ({
     nodes: map.nodes.map((n) => ({ id: n.id, name: n.label })),
-    links: map.edges.map((e) => ({ source: e.from, target: e.to, id: e.id })),
+    links: map.edges.map((e) => ({ source: e.from, target: e.to })),
   }), [map.nodes, map.edges]);
 
   /** Node colour: role-based, dimmed when a different node is selected and
@@ -134,10 +134,6 @@ export default function ConstellationView({
    * textHeight ≈ 4 gives readable but compact labels at the default camera distance.
    * material.depthWrite = false prevents z-fighting with sphere surfaces.
    * --ink (#f1ece0) matches the cream foreground colour used throughout the UI.
-   *
-   * SpriteText extends three.js Sprite (which extends Object3D) — position and
-   * material are inherited but absent from the hand-written SpriteText .d.ts;
-   * cast through `unknown` to avoid type errors while keeping runtime correct.
    */
   const nodeThreeObject = useCallback((node: { id?: string | number; name?: string }) => {
     const label = String(node.name ?? node.id ?? "");
@@ -147,10 +143,11 @@ export default function ConstellationView({
     // SpriteText uses offsetY (its own API) for vertical offset relative to the
     // attachment point. Negative value moves the label downward.
     sprite.offsetY = -8;
-    // Prevent z-fighting with sphere surfaces. SpriteText inherits `material`
-    // from three.js Sprite/Object3D; cast is safe at runtime.
-    const mat = (sprite as unknown as { material?: { depthWrite?: boolean } }).material;
-    if (mat) mat.depthWrite = false;
+    // Prevent z-fighting with sphere surfaces. `material` is inherited from
+    // THREE.Sprite at runtime, but three@0.184 ships no bundled .d.ts and
+    // @types/three is not installed, so the base class is typeless to tsc —
+    // hence the narrow cast. (Do not add @types/three just for this line.)
+    (sprite as unknown as { material: { depthWrite: boolean } }).material.depthWrite = false;
     return sprite;
   }, []);
 

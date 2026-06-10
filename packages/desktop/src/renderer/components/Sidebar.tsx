@@ -77,6 +77,7 @@ export function Sidebar() {
       <button
         onClick={togglePin}
         title={pinned ? "Unpin sidebar" : "Pin sidebar open"}
+        aria-label={pinned ? "Unpin sidebar" : "Pin sidebar open"}
         style={{
           position: "absolute",
           top: "6px",
@@ -88,7 +89,7 @@ export function Sidebar() {
           borderRadius: "3px",
           color: pinned ? "#fff" : "var(--ink-dim)",
           fontSize: "9px",
-          padding: "2px 4px",
+          padding: "8px", // ≥24px hit target (9px glyph + 2×8px padding)
           cursor: "pointer",
           lineHeight: 1,
           transition: "background 0.15s, color 0.15s",
