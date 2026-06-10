@@ -67,8 +67,31 @@ const GLYPH: Partial<Record<string, string>> = {
 
 export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
   const [hovered, setHovered] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
   const [draftLabel, setDraftLabel] = useState(data.label);
   const inputRef = useRef<HTMLInputElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Keyboard accessibility: also show the toolbar while focus is anywhere
+  // inside the node (Tab to the node, then Tab+Enter on the toolbar buttons).
+  // Listen on the react-flow node wrapper (focusable, tabIndex=0) when present
+  // so wrapper focus counts as focus-within; fall back to our root in isolation.
+  useEffect(() => {
+    const host =
+      rootRef.current?.closest<HTMLElement>(".react-flow__node") ??
+      rootRef.current;
+    if (!host) return;
+    const handleFocusIn = () => setFocusWithin(true);
+    const handleFocusOut = (e: FocusEvent) => {
+      if (!host.contains(e.relatedTarget as Node | null)) setFocusWithin(false);
+    };
+    host.addEventListener("focusin", handleFocusIn);
+    host.addEventListener("focusout", handleFocusOut);
+    return () => {
+      host.removeEventListener("focusin", handleFocusIn);
+      host.removeEventListener("focusout", handleFocusOut);
+    };
+  }, []);
 
   // Sync draft when renaming mode activates or label changes
   useEffect(() => {
@@ -164,6 +187,7 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
 
   return (
     <div
+      ref={rootRef}
       style={nodeStyle}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
@@ -255,8 +279,8 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
         }}
       />
 
-      {/* ── Hover mini-toolbar ─────────────────────────────────────────────── */}
-      {hovered && !data.renaming && (
+      {/* ── Mini-toolbar: shown on hover OR focus-within (keyboard access) ── */}
+      {(hovered || focusWithin) && !data.renaming && (
         <div
           className="nodrag"
           style={{
@@ -277,6 +301,7 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
           <button
             className="nodrag"
             title="Duplicate node"
+            aria-label="Duplicate node"
             onClick={(e) => {
               e.stopPropagation();
               data.onDuplicate(id);
@@ -288,6 +313,7 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
           <button
             className="nodrag"
             title="Delete node"
+            aria-label="Delete node"
             onClick={(e) => {
               e.stopPropagation();
               data.onDelete(id);

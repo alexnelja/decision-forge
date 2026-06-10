@@ -5,12 +5,15 @@
  *   "node"  — Rename · Duplicate · Role ▸ · Delete
  *   "pane"  — Add node here · Tidy
  *
- * Closes on click-away (document pointerdown) or Escape.
+ * Accessibility: role="menu" / role="menuitem"; focus moves to the first item
+ * on open; ArrowUp/ArrowDown cycle through items; Enter activates the focused
+ * item; Escape or click-away closes. Position is clamped to the viewport after
+ * measuring the rendered menu.
  *
  * Extension point for Task 6: when `type === "edge"`, add edge-editing items.
  */
 
-import { useEffect, useRef } from "react";
+import { useState, useEffect, useLayoutEffect, useRef } from "react";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -47,6 +50,22 @@ export type ContextMenuProps = NodeContextMenuProps | PaneContextMenuProps;
 
 export function ContextMenu(props: ContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ x: props.x, y: props.y });
+
+  // Clamp the menu into the viewport once we can measure its rendered size.
+  useLayoutEffect(() => {
+    const rect = menuRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPos({
+      x: Math.min(props.x, window.innerWidth - rect.width - 8),
+      y: Math.min(props.y, window.innerHeight - rect.height - 8),
+    });
+  }, [props.x, props.y]);
+
+  // Move focus to the first item on open (keyboard accessibility).
+  useEffect(() => {
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
+  }, []);
 
   // Close on click-away or Escape
   useEffect(() => {
@@ -66,13 +85,34 @@ export function ContextMenu(props: ContextMenuProps) {
     };
   }, [props]);
 
+  // ArrowUp/ArrowDown cycle through items; Enter activates the focused item.
+  function handleMenuKeyDown(e: React.KeyboardEvent) {
+    const items = Array.from(
+      menuRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []
+    );
+    if (items.length === 0) return;
+    const idx = items.indexOf(document.activeElement as HTMLElement);
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      items[(idx + 1) % items.length]!.focus();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      items[(idx - 1 + items.length) % items.length]!.focus();
+    } else if (e.key === "Enter") {
+      e.preventDefault(); // suppress native button Enter→click (would double-fire)
+      (document.activeElement as HTMLElement | null)?.click();
+    }
+  }
+
   return (
     <div
       ref={menuRef}
+      role="menu"
+      onKeyDown={handleMenuKeyDown}
       style={{
         position: "fixed",
-        top: props.y,
-        left: props.x,
+        top: pos.y,
+        left: pos.x,
         zIndex: 1000,
         background: "var(--paper-raised)",
         border: "1px solid var(--paper-rule)",
@@ -183,6 +223,7 @@ function MenuItem({
 }) {
   return (
     <button
+      role="menuitem"
       onClick={onClick}
       style={{
         display: "block",

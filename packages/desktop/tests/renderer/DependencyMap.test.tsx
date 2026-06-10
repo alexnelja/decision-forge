@@ -1,5 +1,5 @@
 import { it, expect, describe, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ReactFlowProvider } from "reactflow";
 import DependencyMap from "../../src/renderer/pages/DependencyMap";
@@ -629,40 +629,163 @@ describe("ContextMenu — pane right-click shows Add node here", () => {
 });
 
 // ---------------------------------------------------------------------------
-// handleAddConnectedNodeAt handler (unit test via direct call shape)
-// Note: drag-from-border-to-empty gesture is not reproducible in jsdom
-// (pointer capture + synthetic drag events over react-flow internals).
-// The handler logic is tested here via the DependencyMap state shape.
-// Full e2e coverage: Task 9 playwright suite.
+// Duplicate — position: a copy must land offset from the SOURCE's rendered
+// position, even when the source has no schema position (CapturePanel-added
+// nodes are positioned by dagre only).
 // ---------------------------------------------------------------------------
-describe("handleAddConnectedNodeAt — handler logic", () => {
-  it("adds a node via capture panel and it appears; duplicating it creates (copy)", async () => {
+describe("Duplicate — position", () => {
+  it("copy of a CapturePanel-added node lands at source+24/+24, not at 24/24", async () => {
     const { container } = render(
       <MemoryRouter>
         <DependencyMap />
       </MemoryRouter>
     );
     const input = screen.getByPlaceholderText(/add a factor/i);
-    fireEvent.change(input, { target: { value: "SourceNode" } });
+    fireEvent.change(input, { target: { value: "Orig" } });
     fireEvent.keyDown(input, { key: "Enter" });
 
-    // Wait for node to appear in canvas
     await waitFor(() => {
-      expect(container.querySelectorAll(".react-flow__node").length).toBeGreaterThanOrEqual(1);
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
     });
 
-    // Select via CapturePanel button (use role to be specific)
-    const nodeBtn = screen.getByRole("button", { name: "SourceNode" });
-    fireEvent.click(nodeBtn);
-
-    // Fire Cmd+D on the canvas wrapper with tabIndex=-1 (our outer div)
-    const canvasWrapper = container.querySelector("[tabindex='-1']");
-    if (canvasWrapper) {
-      fireEvent.keyDown(canvasWrapper, { key: "d", metaKey: true });
-    }
+    // Source sits at the mocked dagre position {111,222}. Duplicate it via
+    // the node context menu.
+    const node = container.querySelector(".react-flow__node")!;
+    fireEvent.contextMenu(node);
+    const dupItem = await screen.findByText("Duplicate");
+    fireEvent.click(dupItem);
 
     await waitFor(() => {
-      expect(screen.queryAllByText(/sourcenode.*copy/i).length).toBeGreaterThanOrEqual(1);
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(2);
+    });
+    const transforms = Array.from(container.querySelectorAll(".react-flow__node")).map(
+      (n) => (n as HTMLElement).style.transform
+    );
+    // Copy must be at source+24/+24 = {135,246} — NOT the fixed {24,24} corner.
+    expect(transforms.some((t) => t.includes("translate(135px,246px)"))).toBe(true);
+    expect(transforms.some((t) => t.includes("translate(24px"))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// ContextMenu — keyboard accessibility + viewport clamping
+// ---------------------------------------------------------------------------
+describe("ContextMenu — keyboard accessibility", () => {
+  it("opens as role=menu with menuitems, focuses the first item, arrows cycle", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "KeyNav" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    });
+
+    fireEvent.contextMenu(container.querySelector(".react-flow__node")!);
+    const menu = await screen.findByRole("menu");
+    const items = within(menu).getAllByRole("menuitem");
+    expect(items.length).toBeGreaterThanOrEqual(4); // Rename/Duplicate/roles/Delete
+
+    // First item focused on open
+    await waitFor(() => {
+      expect(document.activeElement).toBe(items[0]);
+    });
+
+    // ArrowDown / ArrowUp move focus, cycling at the ends
+    fireEvent.keyDown(menu, { key: "ArrowDown" });
+    expect(document.activeElement).toBe(items[1]);
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(items[0]);
+    fireEvent.keyDown(menu, { key: "ArrowUp" });
+    expect(document.activeElement).toBe(items[items.length - 1]);
+  });
+
+  it("clamps the menu position to the viewport at extreme coordinates", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const pane = container.querySelector(".react-flow__pane")!;
+    fireEvent.contextMenu(pane, { clientX: 5000, clientY: 5000 });
+
+    const menu = await screen.findByRole("menu");
+    await waitFor(() => {
+      const left = parseFloat((menu as HTMLElement).style.left);
+      const top = parseFloat((menu as HTMLElement).style.top);
+      expect(left).toBeLessThanOrEqual(window.innerWidth);
+      expect(top).toBeLessThanOrEqual(window.innerHeight);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FactorNode — toolbar on focus-within (Tab + Enter accessibility)
+// ---------------------------------------------------------------------------
+describe("FactorNode — toolbar on focus-within", () => {
+  const baseProps = {
+    id: "n1",
+    xPos: 0,
+    yPos: 0,
+    zIndex: 0,
+    isConnectable: true,
+    selected: false,
+    dragging: false,
+    type: "factor" as const,
+    dragHandle: undefined,
+  };
+
+  it("shows the toolbar with aria-labelled buttons when the node receives focus", () => {
+    const { container } = renderFactor(
+      <FactorNode
+        {...baseProps}
+        data={{
+          label: "Focusable",
+          onRename: vi.fn(),
+          onCancelRename: vi.fn(),
+          onDuplicate: vi.fn(),
+          onDelete: vi.fn(),
+        }}
+      />
+    );
+    const root = container.querySelector("div")!;
+    fireEvent.focusIn(root);
+    expect(screen.getByRole("button", { name: "Duplicate node" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Delete node" })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Focus returns to the canvas wrapper after rename ends (so ⌘D works again)
+// ---------------------------------------------------------------------------
+describe("Rename — focus return", () => {
+  it("rename commit moves focus back to the canvas wrapper", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    const pane = container.querySelector(".react-flow__pane")!;
+    fireEvent.doubleClick(pane);
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).toBeInTheDocument();
+    });
+
+    const renameInput = container.querySelector(".react-flow__node input")!;
+    fireEvent.change(renameInput, { target: { value: "Named" } });
+    fireEvent.keyDown(renameInput, { key: "Enter" });
+
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).not.toBeInTheDocument();
+    });
+    const wrapper = container.querySelector("[data-testid='depmap-canvas']");
+    expect(wrapper).toBeInTheDocument();
+    await waitFor(() => {
+      expect(document.activeElement).toBe(wrapper);
     });
   });
 });

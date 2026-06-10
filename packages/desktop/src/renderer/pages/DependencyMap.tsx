@@ -144,13 +144,17 @@ export default function DependencyMap() {
 
   /**
    * Duplicate a node: clone label + role, append " (copy)", offset position +24/+24.
+   * `sourcePos` is the source's current RENDERED position, passed by LayeredView
+   * from react-flow state — schema position alone is absent for nodes added via
+   * the CapturePanel and never dragged, which would land every copy at {24,24}.
    */
-  function handleDuplicateNode(id: string) {
+  function handleDuplicateNode(id: string, sourcePos?: { x: number; y: number }) {
     const src = map.nodes.find((n) => n.id === id);
     if (!src) return;
     const newId = crypto.randomUUID();
-    const pos = src.position
-      ? { x: src.position.x + 24, y: src.position.y + 24 }
+    const base = sourcePos ?? src.position;
+    const pos = base
+      ? { x: base.x + 24, y: base.y + 24 }
       : { x: 24, y: 24 };
     const newNode: DependencyNode = {
       id: newId,

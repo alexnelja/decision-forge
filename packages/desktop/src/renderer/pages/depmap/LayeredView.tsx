@@ -48,7 +48,8 @@ export interface LayeredViewProps {
   // Task 5 new props
   onAddNodeAt: (label: string, pos: { x: number; y: number }) => void;
   onAddConnectedNodeAt: (sourceId: string, pos: { x: number; y: number }) => void;
-  onDuplicateNode: (id: string) => void;
+  /** `sourcePos` = the node's current rendered position (react-flow state). */
+  onDuplicateNode: (id: string, sourcePos?: { x: number; y: number }) => void;
   onRenameNode: (id: string, label: string) => void;
   onCancelRename: (id: string) => void;
   onStartRename: (id: string) => void;
@@ -108,11 +109,24 @@ function LayeredViewInner({
   const [rfEdges, setRfEdges, onEdgesChange] = useEdgesState([]);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuProps | null>(null);
-  const { fitView, screenToFlowPosition } = useReactFlow();
+  const { fitView, screenToFlowPosition, getNode } = useReactFlow();
 
   // refs for onConnectEnd (v11 only provides the event, no connectionState)
   const connectStartRef = useRef<string | null>(null);
   const didConnectRef = useRef(false);
+
+  // Wrapper div ref — receives focus back after rename ends so ⌘D keeps working.
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  // Duplicate with the node's CURRENT rendered position: schema position is
+  // absent for CapturePanel-added nodes that were never dragged, so the copy
+  // must offset from react-flow's live position instead.
+  const duplicateNode = useCallback(
+    (id: string) => {
+      onDuplicateNode(id, getNode(id)?.position);
+    },
+    [onDuplicateNode, getNode]
+  );
 
   // Track the last structural key so we can skip the structural sync when only
   // style/selection changed.
@@ -138,6 +152,16 @@ function LayeredViewInner({
     },
     []
   );
+
+  // When a rename ends (commit or cancel), return focus to the canvas wrapper
+  // so keyboard shortcuts (⌘D, Delete) work without an extra click.
+  const prevRenamingId = useRef<string | null>(renamingId);
+  useEffect(() => {
+    if (prevRenamingId.current && !renamingId) {
+      wrapperRef.current?.focus();
+    }
+    prevRenamingId.current = renamingId;
+  }, [renamingId]);
 
   // ── Effect 1: STRUCTURAL SYNC ───────────────────────────────────────────
   // Fires when topology (node/edge set) changes.  Responsible for:
@@ -177,7 +201,7 @@ function LayeredViewInner({
             // callbacks wired here so FactorNode can call back into DependencyMap
             onRename: onRenameNode,
             onCancelRename,
-            onDuplicate: onDuplicateNode,
+            onDuplicate: duplicateNode,
             onDelete: onDeleteNode,
           } satisfies FactorNodeData,
         };
@@ -263,7 +287,7 @@ function LayeredViewInner({
             // callbacks always current
             onRename: onRenameNode,
             onCancelRename,
-            onDuplicate: onDuplicateNode,
+            onDuplicate: duplicateNode,
             onDelete: onDeleteNode,
           } satisfies FactorNodeData,
         };
@@ -435,11 +459,11 @@ function LayeredViewInner({
       if ((e.metaKey || e.ctrlKey) && e.key === "d") {
         if (selectedId) {
           e.preventDefault();
-          onDuplicateNode(selectedId);
+          duplicateNode(selectedId);
         }
       }
     },
-    [selectedId, onDuplicateNode]
+    [selectedId, duplicateNode]
   );
 
   // Node context menu
@@ -455,13 +479,13 @@ function LayeredViewInner({
           onSelect(id);
           onStartRename(id);
         },
-        onDuplicate: onDuplicateNode,
+        onDuplicate: duplicateNode,
         onSetRole: onSetRole,
         onDelete: onDeleteNode,
         onClose: () => setContextMenu(null),
       });
     },
-    [onSelect, onStartRename, onDuplicateNode, onSetRole, onDeleteNode]
+    [onSelect, onStartRename, duplicateNode, onSetRole, onDeleteNode]
   );
 
   // Pane context menu — wired on the wrapper div rather than onPaneContextMenu
@@ -508,6 +532,8 @@ function LayeredViewInner({
 
   return (
     <div
+      ref={wrapperRef}
+      data-testid="depmap-canvas"
       style={{
         width: "100%",
         height: "100%",
