@@ -1110,3 +1110,77 @@ describe("DependencyMap — edge handlers via context menu", () => {
     expect(onDeleteEdge).toHaveBeenCalledWith("e1");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Role key removal — spec: absent ≡ "factor". Setting a node back to Factor
+// must REMOVE the role key from the persisted node (not store "role":"factor"),
+// mirroring how sign-key removal works for edges.
+// ---------------------------------------------------------------------------
+describe("Role — selecting Factor removes the role key from the saved node", () => {
+  /** Click Save and return the map passed to the save mock. */
+  async function lastSavedMap() {
+    const saveMock = (window as any).api.maps.save;
+    const before = saveMock.mock.calls.length;
+    fireEvent.click(screen.getByTestId("map-save"));
+    await waitFor(() => {
+      expect(saveMock.mock.calls.length).toBe(before + 1);
+    });
+    return saveMock.mock.calls[saveMock.mock.calls.length - 1][0];
+  }
+
+  it("context-menu path (handleSetRole): Lever then Factor → role key absent", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "RoleNode" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    });
+
+    // Set role to Lever via the node context menu
+    fireEvent.contextMenu(container.querySelector(".react-flow__node")!);
+    fireEvent.click(await screen.findByText("◆ Lever"));
+
+    let saved = await lastSavedMap();
+    expect(saved.nodes[0]!.role).toBe("lever");
+
+    // Set role back to Factor — the role KEY must be removed, not set to "factor"
+    fireEvent.contextMenu(container.querySelector(".react-flow__node")!);
+    fireEvent.click(await screen.findByText("Factor (default)"));
+
+    saved = await lastSavedMap();
+    expect("role" in saved.nodes[0]!).toBe(false);
+  });
+
+  it("inspector radio path (handleUpdateNode): Lever then Factor → role key absent", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "RadioNode" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    });
+
+    // Select the node so the NodeInspector shows its role radio
+    fireEvent.click(screen.getByRole("button", { name: "RadioNode" }));
+    const leverRadio = await screen.findByRole("radio", { name: /lever/i });
+    fireEvent.click(leverRadio);
+
+    let saved = await lastSavedMap();
+    expect(saved.nodes[0]!.role).toBe("lever");
+
+    // Back to Factor via the radio — key must be REMOVED from the saved node
+    fireEvent.click(screen.getByRole("radio", { name: /factor/i }));
+
+    saved = await lastSavedMap();
+    expect("role" in saved.nodes[0]!).toBe(false);
+  });
+});

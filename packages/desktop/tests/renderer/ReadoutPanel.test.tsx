@@ -15,7 +15,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { ReadoutPanel } from "../../src/renderer/pages/depmap/ReadoutPanel";
 import type { DependencyMap as DMap } from "@decision-forge/core";
-import { decisionReadout, classifyLoops } from "@decision-forge/core";
+import { decisionReadout } from "@decision-forge/core";
 
 afterEach(cleanup);
 
@@ -121,16 +121,11 @@ describe("ReadoutPanel — guidance (no roles)", () => {
   it("shows the exact guidance string from core when no roles are set", () => {
     const map = makeNoRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -143,16 +138,11 @@ describe("ReadoutPanel — guidance (no roles)", () => {
   it("does NOT show ACT FIRST or RESOLVE NEXT sections when guidance is shown without roles", () => {
     const map = makeNoRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -165,16 +155,11 @@ describe("ReadoutPanel — guidance (no roles)", () => {
   it("still shows PLAN AROUND with a loop even when guidance is present (no roles)", () => {
     const map = makeNoRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -192,16 +177,11 @@ describe("ReadoutPanel — full roles", () => {
   it("renders DECISION READOUT header", () => {
     const map = makeFullRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -212,16 +192,11 @@ describe("ReadoutPanel — full roles", () => {
   it("shows ACT FIRST section with lever label", () => {
     const map = makeFullRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -234,16 +209,11 @@ describe("ReadoutPanel — full roles", () => {
   it("shows ACT FIRST row with the reason from core", () => {
     const map = makeFullRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -257,16 +227,11 @@ describe("ReadoutPanel — full roles", () => {
   it("shows RESOLVE NEXT section with uncertainty label", () => {
     const map = makeFullRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -278,17 +243,12 @@ describe("ReadoutPanel — full roles", () => {
   it("clicking an ACT FIRST row calls onSelect with the lever nodeId", () => {
     const map = makeFullRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
     const onSelect = vi.fn();
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={onSelect}
       />
     );
@@ -303,17 +263,12 @@ describe("ReadoutPanel — full roles", () => {
   it("clicking a RESOLVE NEXT row calls onSelect with the uncertainty nodeId", () => {
     const map = makeFullRoleMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
     const onSelect = vi.fn();
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={onSelect}
       />
     );
@@ -333,16 +288,11 @@ describe("ReadoutPanel — PLAN AROUND loops", () => {
   it("shows ⟳ reinforcing label for a reinforcing cycle with node labels", () => {
     const map = makeCyclicMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -357,16 +307,11 @@ describe("ReadoutPanel — PLAN AROUND loops", () => {
   it("shows ⇋ balancing label for a balancing cycle", () => {
     const map = makeBalancingMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={vi.fn()}
       />
     );
@@ -378,17 +323,12 @@ describe("ReadoutPanel — PLAN AROUND loops", () => {
   it("clicking a PLAN AROUND loop row calls onSelect with the first loop node", () => {
     const map = makeCyclicMap();
     const readout = decisionReadout(map);
-    const classifiedLoops = classifyLoops({
-      nodes: map.nodes,
-      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
-    });
     const onSelect = vi.fn();
 
     render(
       <ReadoutPanel
         map={map}
         readout={readout}
-        classifiedLoops={classifiedLoops}
         onSelect={onSelect}
       />
     );

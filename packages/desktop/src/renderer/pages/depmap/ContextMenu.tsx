@@ -15,6 +15,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
 import type { DependencyEdge } from "@decision-forge/core";
 import { describeSign, describeConfidence } from "./edge-style";
+import { ROLE_OPTIONS } from "./roles";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -170,28 +171,16 @@ function NodeMenuItems(props: NodeContextMenuProps) {
         onClick={() => { onDuplicate(nodeId); onClose(); }}
       />
       <MenuDivider />
-      {/* Role submenu — inline expansion for simplicity */}
+      {/* Role submenu — inline expansion; options shared with NodeInspector via roles.ts */}
       <MenuLabel label="Role" />
-      <MenuItem
-        label="Factor (default)"
-        onClick={() => { onSetRole(nodeId, "factor"); onClose(); }}
-        indent
-      />
-      <MenuItem
-        label="◎ Objective"
-        onClick={() => { onSetRole(nodeId, "objective"); onClose(); }}
-        indent
-      />
-      <MenuItem
-        label="◆ Lever"
-        onClick={() => { onSetRole(nodeId, "lever"); onClose(); }}
-        indent
-      />
-      <MenuItem
-        label="? Uncertainty"
-        onClick={() => { onSetRole(nodeId, "uncertainty"); onClose(); }}
-        indent
-      />
+      {ROLE_OPTIONS.map((opt) => (
+        <MenuItem
+          key={opt.value}
+          label={opt.label}
+          onClick={() => { onSetRole(nodeId, opt.value); onClose(); }}
+          indent
+        />
+      ))}
       <MenuDivider />
       <MenuItem
         label="Delete"

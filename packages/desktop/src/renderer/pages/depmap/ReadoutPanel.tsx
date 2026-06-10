@@ -12,12 +12,11 @@
  * When a section is empty and no guidance, the section is omitted.
  */
 
-import type { DependencyMap, Readout, ClassifiedLoop } from "@decision-forge/core";
+import type { DependencyMap, Readout } from "@decision-forge/core";
 
 export interface ReadoutPanelProps {
   map: DependencyMap;
   readout: Readout;
-  classifiedLoops: ClassifiedLoop[];
   onSelect: (nodeId: string) => void;
 }
 

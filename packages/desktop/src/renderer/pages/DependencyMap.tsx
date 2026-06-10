@@ -238,7 +238,9 @@ export default function DependencyMap() {
   }, []);
 
   /**
-   * Set the role of a node.
+   * Set the role of a node. Spec: absent ≡ "factor" — selecting Factor
+   * REMOVES the role key (saved JSON must not contain "role":"factor"),
+   * mirroring sign/confidence key removal on edges.
    */
   const handleSetRole = useCallback((
     id: string,
@@ -246,7 +248,11 @@ export default function DependencyMap() {
   ) => {
     setMap((prev) => ({
       ...prev,
-      nodes: prev.nodes.map((n) => (n.id === id ? { ...n, role } : n)),
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== id) return n;
+        const { role: _role, ...rest } = n;
+        return role === "factor" ? rest : { ...rest, role };
+      }),
       updatedAt: new Date().toISOString(),
     }));
   }, []);
@@ -328,9 +334,17 @@ export default function DependencyMap() {
   const handleUpdateNode = useCallback((id: string, patch: { label?: string; note?: string; role?: "objective" | "lever" | "uncertainty" | "factor" }) => {
     setMap((prev) => ({
       ...prev,
-      nodes: prev.nodes.map((n) =>
-        n.id === id ? { ...n, ...patch } : n
-      ),
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== id) return n;
+        // Spec: absent ≡ "factor" — a patch setting role to "factor" must
+        // REMOVE the key from the node, same semantics as handleSetRole.
+        if (patch.role === "factor") {
+          const { role: _patchRole, ...patchRest } = patch;
+          const { role: _nodeRole, ...nodeRest } = n;
+          return { ...nodeRest, ...patchRest };
+        }
+        return { ...n, ...patch };
+      }),
       updatedAt: new Date().toISOString(),
     }));
   }, []);
@@ -403,7 +417,6 @@ export default function DependencyMap() {
           <ReadoutPanel
             map={map}
             readout={analysis.readout}
-            classifiedLoops={analysis.classifiedLoops}
             onSelect={setSelectedId}
           />
           <NodeInspector
