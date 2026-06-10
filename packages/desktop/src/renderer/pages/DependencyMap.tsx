@@ -6,6 +6,7 @@ import { LayeredView } from "./depmap/LayeredView";
 import { StructurePanel } from "./depmap/StructurePanel";
 import { NodeInspector } from "./depmap/NodeInspector";
 import { ReadoutPanel } from "./depmap/ReadoutPanel";
+import type { NodeRole } from "./depmap/roles";
 import { useAnalysis } from "./depmap/useAnalysis";
 import { mapsApi } from "../lib/maps-api";
 
@@ -237,25 +238,8 @@ export default function DependencyMap() {
     setRenamingId(id);
   }, []);
 
-  /**
-   * Set the role of a node. Spec: absent ≡ "factor" — selecting Factor
-   * REMOVES the role key (saved JSON must not contain "role":"factor"),
-   * mirroring sign/confidence key removal on edges.
-   */
-  const handleSetRole = useCallback((
-    id: string,
-    role: "objective" | "lever" | "uncertainty" | "factor"
-  ) => {
-    setMap((prev) => ({
-      ...prev,
-      nodes: prev.nodes.map((n) => {
-        if (n.id !== id) return n;
-        const { role: _role, ...rest } = n;
-        return role === "factor" ? rest : { ...rest, role };
-      }),
-      updatedAt: new Date().toISOString(),
-    }));
-  }, []);
+  // (handleSetRole lives below handleUpdateNode — it delegates to it so the
+  // factor-strips-the-key rule has exactly one implementation.)
 
   // ── Task 6 edge handlers ─────────────────────────────────────────────────
 
@@ -331,13 +315,14 @@ export default function DependencyMap() {
     });
   }, []);
 
-  const handleUpdateNode = useCallback((id: string, patch: { label?: string; note?: string; role?: "objective" | "lever" | "uncertainty" | "factor" }) => {
+  const handleUpdateNode = useCallback((id: string, patch: { label?: string; note?: string; role?: NodeRole }) => {
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) => {
         if (n.id !== id) return n;
         // Spec: absent ≡ "factor" — a patch setting role to "factor" must
-        // REMOVE the key from the node, same semantics as handleSetRole.
+        // REMOVE the key from the node (saved JSON never contains
+        // "role":"factor"), mirroring sign/confidence key removal on edges.
         if (patch.role === "factor") {
           const { role: _patchRole, ...patchRest } = patch;
           const { role: _nodeRole, ...nodeRest } = n;
@@ -348,6 +333,14 @@ export default function DependencyMap() {
       updatedAt: new Date().toISOString(),
     }));
   }, []);
+
+  /**
+   * Set the role of a node (context-menu path). Delegates to handleUpdateNode
+   * so the factor-strips-the-key rule lives in exactly one place.
+   */
+  const handleSetRole = useCallback((id: string, role: NodeRole) => {
+    handleUpdateNode(id, { role });
+  }, [handleUpdateNode]);
 
   const handleRelayout = useCallback((positions: Map<string, { x: number; y: number }>) => {
     setMap((prev) => ({

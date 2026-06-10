@@ -27,6 +27,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Handle, Position } from "reactflow";
 import type { NodeProps } from "reactflow";
+import { roleGlyph } from "./roles";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,16 +51,6 @@ export interface FactorNodeData {
   onDuplicate: (id: string) => void;
   onDelete: (id: string) => void;
 }
-
-// ---------------------------------------------------------------------------
-// Role glyphs
-// ---------------------------------------------------------------------------
-
-const GLYPH: Partial<Record<string, string>> = {
-  objective: "◎",
-  lever: "◆",
-  uncertainty: "?",
-};
 
 // ---------------------------------------------------------------------------
 // Source handle definitions — generated from an array to avoid repetition.
@@ -221,7 +212,7 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
     [commitRename, cancelRename]
   );
 
-  const glyph = data.role ? GLYPH[data.role] : undefined;
+  const glyph = roleGlyph(data.role); // shared glyph source (roles.ts)
 
   // ── Render ────────────────────────────────────────────────────────────────
 

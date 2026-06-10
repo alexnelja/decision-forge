@@ -9,6 +9,7 @@ import ReactFlow, {
   useNodesState,
   useEdgesState,
   useReactFlow,
+  useViewport,
   type Node,
   type Edge,
   type Connection,
@@ -145,6 +146,10 @@ function LayeredViewInner({
   const [contextMenu, setContextMenu] = useState<ContextMenuProps | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
   const { fitView, screenToFlowPosition, flowToScreenPosition, getNode } = useReactFlow();
+  // Live viewport transform — subscribing via useViewport re-renders this
+  // component on every pan/zoom/fitView, keeping overlays (loop badges) in
+  // sync with the canvas instead of going stale at their render-time position.
+  const viewport = useViewport();
 
   // refs for onConnectEnd (v11 only provides the event, no connectionState)
   const connectStartRef = useRef<string | null>(null);
@@ -658,7 +663,9 @@ function LayeredViewInner({
     if (!classifiedLoops || classifiedLoops.length === 0) return [];
     const rfNodeById = new Map(rfNodes.map((n) => [n.id, n]));
 
-    // Build a quick lookup: first loop node id → valence from readout.planAround
+    // Build a quick lookup: first loop node id → valence from readout.planAround.
+    // Keying on nodes[0] is safe because SCCs are disjoint — a node belongs to
+    // at most one loop, so the first node uniquely identifies it.
     const readoutLoopValence = new Map<string, "virtuous" | "vicious" | undefined>();
     for (const item of readout.planAround) {
       if (item.kind === "loop") {
@@ -684,12 +691,14 @@ function LayeredViewInner({
       const classLabel: string = (valence ?? loop.class);
       const label = `${glyph} ${classLabel}`;
 
-      // Convert flow position to screen position for the overlay.
-      const screenPos = flowToScreenPosition({ x: cx, y: cy });
-      const wrapperRect = wrapperRef.current?.getBoundingClientRect();
-      const overlayPos = wrapperRect
-        ? { x: screenPos.x - wrapperRect.left, y: screenPos.y - wrapperRect.top }
-        : { x: cx, y: cy };
+      // Flow → overlay coords via the LIVE viewport transform (useViewport):
+      // overlay = flow*zoom + pan offset. Because useViewport re-renders this
+      // component on every transform change, badges track pan/zoom/fitView
+      // instead of going stale at a render-time flowToScreenPosition snapshot.
+      const overlayPos = {
+        x: cx * viewport.zoom + viewport.x,
+        y: cy * viewport.zoom + viewport.y,
+      };
 
       return { idx, label, ...overlayPos };
     }).filter((b): b is NonNullable<typeof b> => b !== null);

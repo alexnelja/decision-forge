@@ -21,3 +21,13 @@ export const ROLE_OPTIONS: RoleOption[] = [
   { value: "lever",       label: "◆ Lever",           glyph: "◆" },
   { value: "uncertainty", label: "? Uncertainty",     glyph: "?" },
 ];
+
+/**
+ * Glyph for a role — single source of truth for node bodies (FactorNode),
+ * the ReadoutPanel section headers and any future surfaces.
+ * Returns undefined for "factor"/absent (factors carry no glyph).
+ */
+export function roleGlyph(role: NodeRole | undefined): string | undefined {
+  if (!role) return undefined;
+  return ROLE_OPTIONS.find((o) => o.value === role)?.glyph || undefined;
+}

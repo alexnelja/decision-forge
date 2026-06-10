@@ -58,6 +58,9 @@ export function useAnalysis(map: DependencyMap): Analysis {
     }
 
     // Signed graph for classifyLoops + decisionReadout (preserves sign).
+    // NOTE: cycle detection runs three times per memo (analyze → the
+    // findCycles call above → classifyLoops here) — deliberate duplication,
+    // cheap at this module's 10–60 node scale; consolidate only if profiled.
     const signedGraphInput = {
       nodes: map.nodes,
       edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),

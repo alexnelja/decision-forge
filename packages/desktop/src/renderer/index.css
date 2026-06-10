@@ -115,6 +115,12 @@ body::after {
   outline-offset: 4px;
 }
 
+/* Decision Readout rows — hover + keyboard focus parity (no JS DOM mutation) */
+.readout-row:hover,
+.readout-row:focus-visible {
+  background: var(--paper-rule);
+}
+
 /* Small caps, letter-spaced — editorial label */
 .eyebrow {
   font-family: var(--font-sans);

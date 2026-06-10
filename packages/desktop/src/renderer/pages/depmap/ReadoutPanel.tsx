@@ -13,6 +13,7 @@
  */
 
 import type { DependencyMap, Readout } from "@decision-forge/core";
+import { roleGlyph } from "./roles";
 
 export interface ReadoutPanelProps {
   map: DependencyMap;
@@ -44,6 +45,10 @@ export function ReadoutPanel({ map, readout, onSelect }: ReadoutPanelProps) {
   const hasActFirst    = actFirst.length > 0;
   const hasResolveNext = resolveNext.length > 0;
   const hasPlanAround  = planAround.length > 0;
+
+  // Blank canvas already shows its own "Double-click to add your first factor"
+  // hint — guidance ("Mark your objective…") would be premature noise here.
+  if (map.nodes.length === 0) return null;
 
   return (
     <div
@@ -84,31 +89,35 @@ export function ReadoutPanel({ map, readout, onSelect }: ReadoutPanelProps) {
 
       {/* ACT FIRST section */}
       {hasActFirst && (
-        <Section label="Act First" glyph="◆">
-          {actFirst.map((entry) => (
-            <RowButton
-              key={entry.nodeId}
-              label={nodeLabel(map, entry.nodeId)}
-              reason={entry.reason}
-              ariaLabel={nodeLabel(map, entry.nodeId)}
-              onClick={() => onSelect(entry.nodeId)}
-            />
-          ))}
+        <Section label="Act First" glyph={roleGlyph("lever")!}>
+          {actFirst.map((entry) => {
+            const label = nodeLabel(map, entry.nodeId);
+            return (
+              <RowButton
+                key={entry.nodeId}
+                label={label}
+                reason={entry.reason}
+                onClick={() => onSelect(entry.nodeId)}
+              />
+            );
+          })}
         </Section>
       )}
 
       {/* RESOLVE NEXT section */}
       {hasResolveNext && (
-        <Section label="Resolve Next" glyph="?">
-          {resolveNext.map((entry) => (
-            <RowButton
-              key={entry.nodeId}
-              label={nodeLabel(map, entry.nodeId)}
-              reason={entry.reason}
-              ariaLabel={nodeLabel(map, entry.nodeId)}
-              onClick={() => onSelect(entry.nodeId)}
-            />
-          ))}
+        <Section label="Resolve Next" glyph={roleGlyph("uncertainty")!}>
+          {resolveNext.map((entry) => {
+            const label = nodeLabel(map, entry.nodeId);
+            return (
+              <RowButton
+                key={entry.nodeId}
+                label={label}
+                reason={entry.reason}
+                onClick={() => onSelect(entry.nodeId)}
+              />
+            );
+          })}
         </Section>
       )}
 
@@ -117,23 +126,25 @@ export function ReadoutPanel({ map, readout, onSelect }: ReadoutPanelProps) {
         <Section label="Plan Around" glyph={GLYPH_REINFORCING}>
           {planAround.map((item, idx) => {
             if (item.kind === "loop") {
-              const label = loopLabel(map, item);
+              // Spoken-friendly aria-label: no glyphs, e.g.
+              // "reinforcing loop: Price, Volume".
+              const spokenNodes = item.nodes
+                .map((id) => nodeLabel(map, id))
+                .join(", ");
               return (
                 <RowButton
                   key={`loop-${idx}`}
-                  label={label}
-                  ariaLabel={label}
+                  label={loopLabel(map, item)}
+                  ariaLabel={`${item.valence ?? item.class} loop: ${spokenNodes}`}
                   onClick={() => onSelect(item.nodes[0]!)}
                 />
               );
             } else {
-              const label = nodeLabel(map, item.nodeId);
               return (
                 <RowButton
                   key={`ext-${item.nodeId}`}
-                  label={label}
+                  label={nodeLabel(map, item.nodeId)}
                   reason={item.reason}
-                  ariaLabel={label}
                   onClick={() => onSelect(item.nodeId)}
                 />
               );
@@ -204,13 +215,19 @@ function RowButton({
 }: {
   label: string;
   reason?: string;
-  ariaLabel: string;
+  /**
+   * Only pass when the visible text is NOT spoken-friendly (e.g. loop rows
+   * with glyphs). Plain rows rely on the button's text content as their
+   * accessible name.
+   */
+  ariaLabel?: string;
   onClick: () => void;
 }) {
   return (
     <button
       aria-label={ariaLabel}
       onClick={onClick}
+      className="readout-row focus-ring"
       style={{
         display: "block",
         width: "100%",
@@ -224,12 +241,6 @@ function RowButton({
         color: "var(--ink)",
         fontSize: "12px",
         lineHeight: 1.4,
-      }}
-      onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = "var(--paper-rule)";
-      }}
-      onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background = "none";
       }}
     >
       <span style={{ fontWeight: 500 }}>{label}</span>

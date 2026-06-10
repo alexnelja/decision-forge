@@ -117,6 +117,29 @@ function makeBalancingMap(): DMap {
 // Guidance copy — no roles set
 // ---------------------------------------------------------------------------
 
+describe("ReadoutPanel — empty map", () => {
+  it("renders nothing when the map has no nodes (blank canvas shows its own hint)", () => {
+    const map: DMap = {
+      id: "map-empty",
+      name: "Empty",
+      createdAt: "2026-01-01T00:00:00Z",
+      updatedAt: "2026-01-01T00:00:00Z",
+      nodes: [],
+      edges: [],
+    };
+    const readout = decisionReadout(map);
+
+    const { container } = render(
+      <ReadoutPanel map={map} readout={readout} onSelect={vi.fn()} />
+    );
+
+    // No premature "Mark your objective…" noise on a blank canvas
+    expect(screen.queryByText(/mark your objective/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/decision readout/i)).not.toBeInTheDocument();
+    expect(container.firstChild).toBeNull();
+  });
+});
+
 describe("ReadoutPanel — guidance (no roles)", () => {
   it("shows the exact guidance string from core when no roles are set", () => {
     const map = makeNoRoleMap();

@@ -4,18 +4,17 @@
  *
  * jsdom cannot measure layout, so react-flow never renders edge DOM elements
  * by default (edges require both endpoint nodes to have non-zero dimensions).
- * Two shims fix that, scoped to THIS file (vitest isolates jsdom per file):
- *   1. A ResizeObserver mock that invokes its callback on observe() — this is
- *      how react-flow v11's NodeRenderer learns node dimensions.
- *   2. offsetWidth/offsetHeight overridden on HTMLElement.prototype so
- *      updateNodeDimensions sees non-zero size (it reads offsetWidth/Height).
+ * The shared shims in helpers/reactflow-jsdom.ts fix that — importing the
+ * helper applies them to THIS file's fresh jsdom (vitest isolates per file).
  *
  * With those in place, `.react-flow__edge` groups render and we can drive
  * onEdgeClick / onEdgeContextMenu with fireEvent — covering the edge.data
  * threading and the flip/sign guard behaviours end-to-end.
  */
 
-import { it, expect, describe, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import "./helpers/reactflow-jsdom";
+
+import { it, expect, describe, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, waitFor, cleanup, act } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import DependencyMap from "../../src/renderer/pages/DependencyMap";
@@ -23,48 +22,6 @@ import { FITVIEW_DELAY_MS } from "../../src/renderer/pages/depmap/LayeredView";
 import type { DependencyMap as DMap } from "@decision-forge/core";
 
 afterEach(cleanup);
-
-// ---------------------------------------------------------------------------
-// jsdom layout shims (file-scoped; vitest gives each test file a fresh jsdom)
-// ---------------------------------------------------------------------------
-
-beforeAll(() => {
-  // ResizeObserver that fires immediately on observe — react-flow's
-  // NodeRenderer callback maps entries to { nodeElement: entry.target, ... }.
-  global.ResizeObserver = class ResizeObserver {
-    private cb: ResizeObserverCallback;
-    constructor(cb: ResizeObserverCallback) {
-      this.cb = cb;
-    }
-    observe(el: Element) {
-      this.cb([{ target: el } as ResizeObserverEntry], this as any);
-    }
-    unobserve() {}
-    disconnect() {}
-  } as any;
-
-  // react-flow reads the viewport zoom via `new window.DOMMatrixReadOnly(
-  // style.transform).m22` — jsdom has no DOMMatrixReadOnly, so stub one
-  // that reports identity zoom.
-  (window as any).DOMMatrixReadOnly = class DOMMatrixReadOnly {
-    m22 = 1;
-    constructor(_transform?: string) {}
-  };
-
-  // Non-zero dimensions so updateNodeDimensions accepts the node.
-  Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
-    configurable: true,
-    get() {
-      return 100;
-    },
-  });
-  Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
-    configurable: true,
-    get() {
-      return 40;
-    },
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Fixture map + mocked persistence API

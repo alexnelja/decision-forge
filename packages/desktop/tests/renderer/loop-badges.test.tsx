@@ -5,12 +5,13 @@
  * pointer-events-none label at the loop centroid showing:
  *   "⟳ reinforcing" / "⟳ vicious" / "⟳ virtuous" / "⇋ balancing"
  *
- * Uses the same jsdom shims as edge-editing.test.tsx to make react-flow
- * actually render nodes in jsdom (ResizeObserver + DOMMatrixReadOnly +
- * offsetWidth/offsetHeight).
+ * Uses the shared react-flow jsdom shims (ResizeObserver + DOMMatrixReadOnly +
+ * offsetWidth/offsetHeight) — see helpers/reactflow-jsdom.ts.
  */
 
-import { it, expect, describe, vi, beforeAll, beforeEach, afterEach } from "vitest";
+import "./helpers/reactflow-jsdom";
+
+import { it, expect, describe, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, cleanup, act } from "@testing-library/react";
 import { fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
@@ -19,36 +20,6 @@ import { FITVIEW_DELAY_MS } from "../../src/renderer/pages/depmap/LayeredView";
 import type { DependencyMap as DMap } from "@decision-forge/core";
 
 afterEach(cleanup);
-
-// ---------------------------------------------------------------------------
-// jsdom layout shims (file-scoped — matches edge-editing.test.tsx)
-// ---------------------------------------------------------------------------
-
-beforeAll(() => {
-  global.ResizeObserver = class ResizeObserver {
-    private cb: ResizeObserverCallback;
-    constructor(cb: ResizeObserverCallback) { this.cb = cb; }
-    observe(el: Element) {
-      this.cb([{ target: el } as ResizeObserverEntry], this as any);
-    }
-    unobserve() {}
-    disconnect() {}
-  } as any;
-
-  (window as any).DOMMatrixReadOnly = class DOMMatrixReadOnly {
-    m22 = 1;
-    constructor(_transform?: string) {}
-  };
-
-  Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
-    configurable: true,
-    get() { return 100; },
-  });
-  Object.defineProperty(HTMLElement.prototype, "offsetHeight", {
-    configurable: true,
-    get() { return 40; },
-  });
-});
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -181,5 +152,45 @@ describe("Loop badges — overlay on canvas", () => {
     await act(() => new Promise((resolve) => setTimeout(resolve, 50)));
     expect(screen.queryByText(/⟳/)).not.toBeInTheDocument();
     expect(screen.queryByText(/⇋/)).not.toBeInTheDocument();
+  });
+
+  it("badge position derives from the CURRENT viewport transform (tracks pan/zoom)", async () => {
+    // The reinforcing-map loop nodes sit at (0,0) and (200,0); with the mocked
+    // 100x40 dimensions their centres are (50,20) and (250,20) → flow-space
+    // centroid (150, 20). The badge overlay position must equal
+    // centroid*zoom + viewport offset, read from the LIVE transform on the
+    // .react-flow__viewport element. Pan the canvas via wheel (panOnScroll is
+    // enabled), then assert the badge tracked the new transform — pre-fix the
+    // badge was computed via flowToScreenPosition at render time and nothing
+    // re-rendered on transform change, so it sat at the stale position.
+    // NOTE: if jsdom's d3-zoom wheel path doesn't move the transform, this
+    // degrades to a derivation-consistency check at identity transform; the
+    // interactive pan/zoom behaviour is also covered by the Task 9 e2e sweep.
+    const { container } = await renderWithMap(makeReinforcingMap());
+
+    // Pan the viewport via wheel scroll on the pane (panOnScroll=true).
+    const pane = container.querySelector(".react-flow__pane")!;
+    fireEvent.wheel(pane, { deltaX: 40, deltaY: 80 });
+    await act(() => new Promise((resolve) => setTimeout(resolve, 30)));
+
+    await waitFor(() => {
+      const viewportEl = container.querySelector(".react-flow__viewport") as HTMLElement;
+      expect(viewportEl).toBeInTheDocument();
+      const m = /translate\((-?[\d.]+)px,\s*(-?[\d.]+)px\)\s*scale\((-?[\d.]+)\)/.exec(
+        viewportEl.style.transform
+      );
+      expect(m).not.toBeNull();
+      const vx = parseFloat(m![1]!);
+      const vy = parseFloat(m![2]!);
+      const zoom = parseFloat(m![3]!);
+
+      const CENTROID = { x: 150, y: 20 };
+      const expected = { x: CENTROID.x * zoom + vx, y: CENTROID.y * zoom + vy };
+
+      const badge = container.querySelector("[data-testid='loop-badge-0']") as HTMLElement;
+      expect(badge).toBeInTheDocument();
+      expect(parseFloat(badge.style.left)).toBeCloseTo(expected.x, 1);
+      expect(parseFloat(badge.style.top)).toBeCloseTo(expected.y, 1);
+    });
   });
 });
