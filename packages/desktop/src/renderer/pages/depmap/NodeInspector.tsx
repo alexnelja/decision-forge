@@ -7,10 +7,11 @@
 
 import { useState, useEffect } from "react";
 import type { DependencyNode } from "@decision-forge/core";
+import { ROLE_OPTIONS, type NodeRole } from "./roles";
 
 interface NodeInspectorProps {
   node: DependencyNode | null;
-  onUpdate: (id: string, patch: { label?: string; note?: string }) => void;
+  onUpdate: (id: string, patch: { label?: string; note?: string; role?: NodeRole }) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
 }
@@ -189,6 +190,55 @@ export function NodeInspector({ node, onUpdate, onDelete, onClose }: NodeInspect
         />
       </div>
 
+      {/* Role radio row */}
+      <div style={{ marginBottom: "12px" }}>
+        <div
+          style={{
+            fontSize: "10px",
+            textTransform: "uppercase",
+            letterSpacing: "0.07em",
+            color: "var(--ink-dim)",
+            marginBottom: "5px",
+          }}
+        >
+          Role
+        </div>
+        <div
+          role="radiogroup"
+          aria-label="Node role"
+          style={{ display: "flex", flexDirection: "column", gap: "4px" }}
+        >
+          {ROLE_OPTIONS.map((opt) => {
+            const checked = (node.role ?? "factor") === opt.value;
+            return (
+              <label
+                key={opt.value}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  cursor: "pointer",
+                  fontSize: "12px",
+                  color: "var(--ink)",
+                  fontFamily: "var(--font-display, inherit)",
+                }}
+              >
+                <input
+                  type="radio"
+                  name={`role-${node.id}`}
+                  value={opt.value}
+                  checked={checked}
+                  aria-label={opt.label}
+                  onChange={() => onUpdate(node.id, { role: opt.value })}
+                  style={{ accentColor: "var(--sec-depmap, #8b7cf8)" }}
+                />
+                {opt.label}
+              </label>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Stored fields caption */}
       <p
         style={{
@@ -198,7 +248,7 @@ export function NodeInspector({ node, onUpdate, onDelete, onClose }: NodeInspect
           lineHeight: 1.4,
         }}
       >
-        Stores: id · label · note · position
+        Stores: id · label · note · role · position
       </p>
 
       {/* Delete button */}

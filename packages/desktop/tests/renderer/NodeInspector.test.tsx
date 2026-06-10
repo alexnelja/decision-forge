@@ -95,3 +95,84 @@ describe("NodeInspector", () => {
     expect(onClose).toHaveBeenCalled();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Role radio — Task 7 TDD (tests written before implementation)
+// ---------------------------------------------------------------------------
+
+describe("NodeInspector — role radio", () => {
+  it("renders role radio group with Factor, Objective, Lever, Uncertainty options", () => {
+    render(
+      <NodeInspector node={node} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    // All four role options should be present
+    expect(screen.getByRole("radio", { name: /factor/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /objective/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /lever/i })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: /uncertainty/i })).toBeInTheDocument();
+  });
+
+  it("Factor radio is selected by default when node has no role", () => {
+    render(
+      <NodeInspector node={node} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    const factorRadio = screen.getByRole("radio", { name: /factor/i }) as HTMLInputElement;
+    expect(factorRadio.checked).toBe(true);
+  });
+
+  it("Objective radio is checked when node.role is 'objective'", () => {
+    const objNode = { ...node, role: "objective" as const };
+    render(
+      <NodeInspector node={objNode} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    const objRadio = screen.getByRole("radio", { name: /objective/i }) as HTMLInputElement;
+    expect(objRadio.checked).toBe(true);
+  });
+
+  it("Lever radio is checked when node.role is 'lever'", () => {
+    const levNode = { ...node, role: "lever" as const };
+    render(
+      <NodeInspector node={levNode} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    const levRadio = screen.getByRole("radio", { name: /lever/i }) as HTMLInputElement;
+    expect(levRadio.checked).toBe(true);
+  });
+
+  it("Uncertainty radio is checked when node.role is 'uncertainty'", () => {
+    const uncNode = { ...node, role: "uncertainty" as const };
+    render(
+      <NodeInspector node={uncNode} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    const uncRadio = screen.getByRole("radio", { name: /uncertainty/i }) as HTMLInputElement;
+    expect(uncRadio.checked).toBe(true);
+  });
+
+  it("selecting Lever calls onUpdate with { role: 'lever' }", () => {
+    const onUpdate = vi.fn();
+    render(
+      <NodeInspector node={node} onUpdate={onUpdate} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    fireEvent.click(screen.getByRole("radio", { name: /lever/i }));
+    expect(onUpdate).toHaveBeenCalledWith(node.id, { role: "lever" });
+  });
+
+  it("selecting Objective calls onUpdate with { role: 'objective' }", () => {
+    const onUpdate = vi.fn();
+    render(
+      <NodeInspector node={node} onUpdate={onUpdate} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    fireEvent.click(screen.getByRole("radio", { name: /objective/i }));
+    expect(onUpdate).toHaveBeenCalledWith(node.id, { role: "objective" });
+  });
+
+  it("selecting Factor clears the role (calls onUpdate with { role: 'factor' })", () => {
+    const onUpdate = vi.fn();
+    const levNode = { ...node, role: "lever" as const };
+    render(
+      <NodeInspector node={levNode} onUpdate={onUpdate} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    // Select factor — should call with role: "factor" so DependencyMap.handleSetRole can handle key removal
+    fireEvent.click(screen.getByRole("radio", { name: /factor/i }));
+    expect(onUpdate).toHaveBeenCalledWith(levNode.id, { role: "factor" });
+  });
+});

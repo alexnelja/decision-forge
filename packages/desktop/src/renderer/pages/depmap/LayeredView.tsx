@@ -647,6 +647,54 @@ function LayeredViewInner({
     setSelectedEdgeId(null);
   }, [contextMenu]);
 
+  // ── Loop badge computation ─────────────────────────────────────────────
+  // For each classified loop, compute a centroid from rfNode positions and
+  // render a floating, pointer-events-none label. Computed at render time
+  // from rfNodes so badges track node drags automatically.
+  // Cross-reference readout.planAround to get valence (virtuous/vicious) when
+  // available — classifiedLoops carries only class (reinforcing/balancing).
+  const loopBadges = (() => {
+    const { classifiedLoops, readout } = analysis;
+    if (!classifiedLoops || classifiedLoops.length === 0) return [];
+    const rfNodeById = new Map(rfNodes.map((n) => [n.id, n]));
+
+    // Build a quick lookup: first loop node id → valence from readout.planAround
+    const readoutLoopValence = new Map<string, "virtuous" | "vicious" | undefined>();
+    for (const item of readout.planAround) {
+      if (item.kind === "loop") {
+        readoutLoopValence.set(item.nodes[0] ?? "", item.valence);
+      }
+    }
+
+    return classifiedLoops.map((loop, idx) => {
+      const positions = loop.nodes
+        .map((id) => rfNodeById.get(id))
+        .filter((n): n is NonNullable<typeof n> => !!n)
+        .map((n) => ({
+          x: n.position.x + (n.width ?? 0) / 2,
+          y: n.position.y + (n.height ?? 0) / 2,
+        }));
+      if (positions.length === 0) return null;
+      const cx = positions.reduce((s, p) => s + p.x, 0) / positions.length;
+      const cy = positions.reduce((s, p) => s + p.y, 0) / positions.length;
+
+      const glyph = loop.class === "balancing" ? "⇋" : "⟳";
+      // Build label text: valence takes precedence over plain class name.
+      const valence = readoutLoopValence.get(loop.nodes[0] ?? "");
+      const classLabel: string = (valence ?? loop.class);
+      const label = `${glyph} ${classLabel}`;
+
+      // Convert flow position to screen position for the overlay.
+      const screenPos = flowToScreenPosition({ x: cx, y: cy });
+      const wrapperRect = wrapperRef.current?.getBoundingClientRect();
+      const overlayPos = wrapperRect
+        ? { x: screenPos.x - wrapperRect.left, y: screenPos.y - wrapperRect.top }
+        : { x: cx, y: cy };
+
+      return { idx, label, ...overlayPos };
+    }).filter((b): b is NonNullable<typeof b> => b !== null);
+  })();
+
   const showHairballNotice = map.nodes.length > 20 && !selectedId;
   const showEmptyHint = map.nodes.length === 0;
 
@@ -763,6 +811,35 @@ function LayeredViewInner({
       >
         Tidy
       </button>
+
+      {/* Loop badge overlay — pointer-events-none floating labels at loop centroids */}
+      {loopBadges.map((badge) => (
+        <div
+          key={badge.idx}
+          data-testid={`loop-badge-${badge.idx}`}
+          style={{
+            position: "absolute",
+            left: badge.x,
+            top: badge.y,
+            transform: "translate(-50%, -50%)",
+            zIndex: 8,
+            pointerEvents: "none",
+            color: "var(--ink-dim)",
+            fontSize: "10px",
+            fontVariant: "small-caps",
+            letterSpacing: "0.06em",
+            fontFamily: "var(--font-display, inherit)",
+            userSelect: "none",
+            background: "var(--paper-base, transparent)",
+            padding: "1px 4px",
+            borderRadius: "3px",
+            border: "1px solid var(--paper-rule)",
+            opacity: 0.85,
+          }}
+        >
+          {badge.label}
+        </div>
+      ))}
 
       <ReactFlow
         nodes={rfNodes}

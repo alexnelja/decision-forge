@@ -5,6 +5,7 @@ import { CapturePanel } from "./depmap/CapturePanel";
 import { LayeredView } from "./depmap/LayeredView";
 import { StructurePanel } from "./depmap/StructurePanel";
 import { NodeInspector } from "./depmap/NodeInspector";
+import { ReadoutPanel } from "./depmap/ReadoutPanel";
 import { useAnalysis } from "./depmap/useAnalysis";
 import { mapsApi } from "../lib/maps-api";
 
@@ -324,7 +325,7 @@ export default function DependencyMap() {
     });
   }, []);
 
-  const handleUpdateNode = useCallback((id: string, patch: { label?: string; note?: string }) => {
+  const handleUpdateNode = useCallback((id: string, patch: { label?: string; note?: string; role?: "objective" | "lever" | "uncertainty" | "factor" }) => {
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.map((n) =>
@@ -399,6 +400,12 @@ export default function DependencyMap() {
       lede="Map the factors of a decision and the lines of force between them. Read the structure back: what drives what, where the loops are, what a change ripples into."
       marginalia={
         <>
+          <ReadoutPanel
+            map={map}
+            readout={analysis.readout}
+            classifiedLoops={analysis.classifiedLoops}
+            onSelect={setSelectedId}
+          />
           <NodeInspector
             node={selectedNode}
             onUpdate={handleUpdateNode}

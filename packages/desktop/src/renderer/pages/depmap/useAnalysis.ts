@@ -1,12 +1,22 @@
 import { useMemo } from "react";
-import { analyze, findCycles, reachDownstream } from "@decision-forge/core";
-import type { DependencyMap } from "@decision-forge/core";
+import {
+  analyze,
+  findCycles,
+  reachDownstream,
+  decisionReadout,
+  classifyLoops,
+} from "@decision-forge/core";
+import type { DependencyMap, Readout, ClassifiedLoop } from "@decision-forge/core";
 
 export type Analysis = ReturnType<typeof analyze> & {
   cycleNodeIds: Set<string>;
   cycleEdgeIds: Set<string>;
   /** Thin graph shape for reachability helpers (avoids rebuilding in callers). */
   graphInput: { nodes: Array<{ id: string }>; edges: Array<{ from: string; to: string }> };
+  /** Decision Readout (act first / resolve next / plan around + guidance). */
+  readout: Readout;
+  /** Classified loops (reinforcing / balancing) for badge overlay. */
+  classifiedLoops: ClassifiedLoop[];
 };
 
 export function useAnalysis(map: DependencyMap): Analysis {
@@ -47,6 +57,15 @@ export function useAnalysis(map: DependencyMap): Analysis {
       }
     }
 
-    return { ...result, cycleNodeIds, cycleEdgeIds, graphInput };
+    // Signed graph for classifyLoops + decisionReadout (preserves sign).
+    const signedGraphInput = {
+      nodes: map.nodes,
+      edges: map.edges.map((e) => ({ from: e.from, to: e.to, sign: e.sign })),
+    };
+
+    const classifiedLoopsResult = classifyLoops(signedGraphInput);
+    const readout = decisionReadout(map);
+
+    return { ...result, cycleNodeIds, cycleEdgeIds, graphInput, readout, classifiedLoops: classifiedLoopsResult };
   }, [map]);
 }
