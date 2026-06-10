@@ -1,5 +1,27 @@
 # § IV Dependency Map — Redesign Notes & Session Handoff (2026-06-09)
 
+## RESOLVED (2026-06-10)
+
+All 8 second-round feedback items addressed on PR #12 (`feat/dependency-map`).
+Task → commit mapping (run `git log --oneline bbaaf92..HEAD` to verify):
+
+| Task | Item | Key commit(s) |
+|------|------|---------------|
+| T1 | Schema: `node.role` + `edge.confidence`, drop reserved trio | `eac63d5` |
+| T2 | Core loop classification (reinforcing/balancing) + `loopValence` | `7c19738` |
+| T3 | Core `decisionReadout()` — act first / resolve next / plan around | `8d03235`, `1a685bf` |
+| T4 | Tidy fix: dagre positions applied to react-flow nodes immediately | `b531cd1`, `339428f` |
+| T5 | FactorNode Easy Connect: dbl-click add, drag-to-new, rename, toolbar, ⌘D | `8c46ff1`, `443040a`, `6d2f4b8`, `5eb6b8b`, `b0c0d9b` |
+| T6 | EdgeToolbar: flip/sign/confidence/re-point; polarity colours; assumption dashes | `fda243f`, `409e22d`, `3daf3e2`, `ffd7649` |
+| T7 | Decision Readout panel + role radio in NodeInspector + loop badges | `5088775`, `cce3651`, `7a202cc` |
+| T8 | Icon chrome, collapsible Contents nav, 3D node labels + polarity links | `0951066`, `d6d28ef`, `cc5014f`, `36fac27` |
+| T9 | e2e sweep: depmap spec fixed + full gesture flow test; all 8 e2e green | see below |
+
+**Final test counts:** 77 core · 189 desktop unit · 8 e2e — all green.
+**TypeScript:** `tsc --noEmit` exactly 4 pre-existing errors (nego-api.ts ×2, mc.spec.ts ×2); zero new.
+
+---
+
 **Read this first to resume.** The Dependency Map module v1 was built (PR #12) and then
 **user-tested by Alex**, who found it unintuitive. We started a **redesign brainstorm**
 (paradigm + interaction + connectors) that is **partly done**. This doc captures the
