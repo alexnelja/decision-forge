@@ -115,8 +115,9 @@ describe("DependencyMap page", () => {
       const transforms = Array.from(nodes).map(
         (n) => (n as HTMLElement).style.transform
       );
-      // At least one node should show the second-call x-coordinate (333).
-      expect(transforms.some((t) => t.includes("333"))).toBe(true);
+      // At least one node should show the second-call position. Verified
+      // empirically: react-flow emits "translate(333px,444px)" in jsdom.
+      expect(transforms.some((t) => t.includes("translate(333px"))).toBe(true);
     });
   });
 });

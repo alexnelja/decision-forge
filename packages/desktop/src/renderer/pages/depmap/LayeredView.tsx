@@ -87,6 +87,27 @@ function LayeredViewInner({
   // style/selection changed.
   const prevStructKey = useRef<string>("");
 
+  // Deferred fitView scheduling: the 50 ms delay lets react-flow finish
+  // painting before measuring, but an unguarded setTimeout could fire after
+  // unmount. Keep the pending timer in a ref, clear any previous one before
+  // scheduling a new one, and clear on unmount.
+  const fitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleFitView = useCallback(() => {
+    if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+    fitTimerRef.current = setTimeout(() => {
+      fitTimerRef.current = null;
+      fitView({ padding: 0.2 });
+    }, 50);
+  }, [fitView]);
+
+  useEffect(
+    () => () => {
+      if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
+    },
+    []
+  );
+
   // ── Effect 1: STRUCTURAL SYNC ───────────────────────────────────────────
   // Fires when topology (node/edge set) changes.  Responsible for:
   //   - initialising positions (saved → existing RF position → dagre)
@@ -155,7 +176,7 @@ function LayeredViewInner({
 
     // Fit view after a topology change (load or add/delete nodes).
     // Small timeout lets RF finish painting the new nodes before measuring.
-    setTimeout(() => fitView({ padding: 0.2 }), 50);
+    scheduleFitView();
   }, [structKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Effect 2: STYLE SYNC ────────────────────────────────────────────────
@@ -330,8 +351,8 @@ function LayeredViewInner({
       })
     );
     onRelayout(positions);
-    setTimeout(() => fitView({ padding: 0.2 }), 50);
-  }, [map.nodes, map.edges, onRelayout, setRfNodes, fitView]);
+    scheduleFitView();
+  }, [map.nodes, map.edges, onRelayout, setRfNodes, scheduleFitView]);
 
   const showHairballNotice = map.nodes.length > 20 && !selectedId;
 
