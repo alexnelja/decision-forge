@@ -73,6 +73,9 @@ importers:
       reactflow:
         specifier: ^11.11.4
         version: 11.11.4(@types/react@18.3.28)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
+      three-spritetext:
+        specifier: ^1.10.0
+        version: 1.10.0(three@0.184.0)
     devDependencies:
       '@playwright/test':
         specifier: ^1.48.0
@@ -2395,6 +2398,12 @@ packages:
     engines: {node: '>=12'}
     peerDependencies:
       three: '>=0.179'
+
+  three-spritetext@1.10.0:
+    resolution: {integrity: sha512-t08iP1FCU1lQh8T5MmCpdijKgas8GDHJE0LqMGBuVu3xqMMpFnEZhTlih7FlxLPQizHIGoumUSpfOlY1GO/Tgg==}
+    engines: {node: '>=12'}
+    peerDependencies:
+      three: '>=0.86.0'
 
   three@0.184.0:
     resolution: {integrity: sha512-wtTRjG92pM5eUg/KuUnHsqSAlPM296brTOcLgMRqEeylYTh/CdtvKUvCyyCQTzFuStieWxvZb8mVTMvdPyUpxg==}
@@ -4887,6 +4896,10 @@ snapshots:
       float-tooltip: 1.7.5
       kapsule: 1.16.3
       polished: 4.3.1
+      three: 0.184.0
+
+  three-spritetext@1.10.0(three@0.184.0):
+    dependencies:
       three: 0.184.0
 
   three@0.184.0: {}
