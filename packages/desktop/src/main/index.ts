@@ -17,16 +17,39 @@ const PORT = 8765;
 let sidecar: Sidecar | null = null;
 
 async function createWindow(): Promise<void> {
+  // When the e2e suite sets DF_E2E_INACTIVE=1 we want the window to render
+  // fully (so screenshots and CDP-driven interactions work) without ever
+  // stealing OS focus from the developer's active application.
+  // The standard pattern: create with show:false, then reveal via
+  // showInactive() from the ready-to-show event.  Normal (non-test) launches
+  // are byte-for-byte unchanged — the flag is absent so the old path runs.
+  const e2eInactive = process.env.DF_E2E_INACTIVE === "1";
+
+  if (e2eInactive && process.platform === "darwin") {
+    // Suppress the dock bounce so the icon doesn't flash during test runs.
+    app.dock?.hide();
+  }
+
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
     backgroundColor: "#0a0a0a",
+    // In inactive mode we control visibility manually via ready-to-show.
+    show: !e2eInactive,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false
     }
   });
+
+  if (e2eInactive) {
+    // Show the window without activating it (no OS focus steal).
+    win.once("ready-to-show", () => {
+      win.showInactive();
+    });
+  }
+
   process.env.SIDECAR_URL = sidecar?.baseUrl ?? `http://127.0.0.1:${PORT}`;
   if (process.env.VITE_DEV_SERVER_URL) {
     await win.loadURL(process.env.VITE_DEV_SERVER_URL);
