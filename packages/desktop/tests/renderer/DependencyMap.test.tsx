@@ -1112,6 +1112,87 @@ describe("DependencyMap — edge handlers via context menu", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Fix 2: ContextMenu role items carry title tooltips with descriptions
+// ---------------------------------------------------------------------------
+describe("ContextMenu role items — title tooltips", () => {
+  it("Objective role menu item has a title tooltip", () => {
+    render(
+      <ContextMenu
+        type="node"
+        x={100}
+        y={100}
+        nodeId="n1"
+        onRename={vi.fn()}
+        onDuplicate={vi.fn()}
+        onSetRole={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    const objItem = screen.getByText(/◎ Objective/i).closest("button");
+    expect(objItem).toBeInTheDocument();
+    expect(objItem!.getAttribute("title")).toBeTruthy();
+  });
+
+  it("Lever role menu item has a title tooltip", () => {
+    render(
+      <ContextMenu
+        type="node"
+        x={100}
+        y={100}
+        nodeId="n1"
+        onRename={vi.fn()}
+        onDuplicate={vi.fn()}
+        onSetRole={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    const levItem = screen.getByText(/◆ Lever/i).closest("button");
+    expect(levItem).toBeInTheDocument();
+    expect(levItem!.getAttribute("title")).toBeTruthy();
+  });
+
+  it("Uncertainty role menu item has a title tooltip", () => {
+    render(
+      <ContextMenu
+        type="node"
+        x={100}
+        y={100}
+        nodeId="n1"
+        onRename={vi.fn()}
+        onDuplicate={vi.fn()}
+        onSetRole={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    const uncItem = screen.getByText(/\? Uncertainty/i).closest("button");
+    expect(uncItem).toBeInTheDocument();
+    expect(uncItem!.getAttribute("title")).toBeTruthy();
+  });
+
+  it("Factor (default) role menu item has a title tooltip", () => {
+    render(
+      <ContextMenu
+        type="node"
+        x={100}
+        y={100}
+        nodeId="n1"
+        onRename={vi.fn()}
+        onDuplicate={vi.fn()}
+        onSetRole={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    );
+    const facItem = screen.getByText(/Factor \(default\)/i).closest("button");
+    expect(facItem).toBeInTheDocument();
+    expect(facItem!.getAttribute("title")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Role key removal — spec: absent ≡ "factor". Setting a node back to Factor
 // must REMOVE the role key from the persisted node (not store "role":"factor"),
 // mirroring how sign-key removal works for edges.

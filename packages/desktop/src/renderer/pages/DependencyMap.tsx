@@ -751,12 +751,13 @@ export default function DependencyMap() {
             </Suspense>
           )}
 
-          {/* Direction hint — bottom-left of canvas */}
+          {/* Direction hint — bottom of canvas, offset right of the react-flow
+              Controls (+/− buttons) which sit at bottom-left ~40px wide. */}
           <div
             style={{
               position: "absolute",
               bottom: "10px",
-              left: "12px",
+              left: "56px",
               fontSize: "10px",
               color: "var(--ink-faint)",
               pointerEvents: "none",
