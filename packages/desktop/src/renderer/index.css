@@ -250,6 +250,17 @@ body::after {
   opacity: 0.85;
 }
 
+/* ── react-flow marquee selection rectangle ─────────────────────────────── */
+/* Override the stock blue selection box with the depmap palette.             */
+/* .react-flow__selection  = drag-to-select lasso rectangle                  */
+/* .react-flow__nodesselection-rect = the box drawn around selected nodes    */
+.react-flow__selection,
+.react-flow__nodesselection-rect {
+  border: 1px dashed var(--sec-depmap) !important;
+  background: rgba(143, 122, 230, 0.06) !important; /* --sec-depmap at 6% opacity */
+  border-radius: 2px !important;
+}
+
 /* Hairline grid background — graph paper */
 .graph-paper {
   background-image:

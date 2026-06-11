@@ -17,6 +17,11 @@ function normalize(val: number, max: number): number {
 const SVG_SIZE = 120;
 const SVG_PAD = 14;
 const PLOT_SIZE = SVG_SIZE - SVG_PAD * 2;
+// Minimum inset from the plot edge for dots, keeping them clear of corner labels.
+// Quadrant labels sit at y=SVG_PAD+8 (top corners) and y=SVG_PAD+PLOT_SIZE-3
+// (bottom corners) in 7px font.  DOT_MARGIN = 14 keeps dots at least 14px
+// from each edge, clearing even the top labels (which sit at offset 8) by ~6px.
+const DOT_MARGIN = 14;
 
 export function StructurePanel({ map, selectedId }: StructurePanelProps) {
   const analysis = useAnalysis(map);
@@ -42,9 +47,17 @@ export function StructurePanel({ map, selectedId }: StructurePanelProps) {
     return vals.map((v) => ({
       id: v.id,
       // x = influence (out-degree), y = dependence (in-degree)
-      // Plot: x grows right, y grows down → invert y so high dep = top
-      cx: SVG_PAD + normalize(v.influence, maxInf) * PLOT_SIZE,
-      cy: SVG_PAD + (1 - normalize(v.dependence, maxDep)) * PLOT_SIZE,
+      // Plot: x grows right, y grows down → invert y so high dep = top.
+      // Clamp dots DOT_MARGIN px away from each plot edge so they never sit
+      // on top of the corner quadrant labels ("Dependent", "Drivers", etc.).
+      cx: Math.max(
+        SVG_PAD + DOT_MARGIN,
+        Math.min(SVG_PAD + PLOT_SIZE - DOT_MARGIN, SVG_PAD + normalize(v.influence, maxInf) * PLOT_SIZE)
+      ),
+      cy: Math.max(
+        SVG_PAD + DOT_MARGIN,
+        Math.min(SVG_PAD + PLOT_SIZE - DOT_MARGIN, SVG_PAD + (1 - normalize(v.dependence, maxDep)) * PLOT_SIZE)
+      ),
       quadrant: v.quadrant,
     }));
   }, [micmac]);
