@@ -313,7 +313,8 @@ export function VariableCard({
   linkedLabel,
   linkedNote,
   linkedBroken,
-  nameLocked
+  nameLocked,
+  removable = true
 }: {
   variable: MCVariable;
   onChange: (v: MCVariable) => void;
@@ -327,6 +328,8 @@ export function VariableCard({
   linkedBroken?: boolean;
   /** When true, the name input is disabled (persisted in map + formulas). */
   nameLocked?: boolean;
+  /** When false, the remove (×) button is not rendered (linked cards). */
+  removable?: boolean;
 }) {
   const idPrefix = useId();
   const accent = "var(--sec-mc, #c4d82e)";
@@ -341,14 +344,16 @@ export function VariableCard({
         {idx && <span className="text-ink-faint">·</span>}
         <span>{kindLong(variable.distribution.kind)}</span>
       </div>
-      <button
-        type="button"
-        aria-label="Remove variable"
-        onClick={onRemove}
-        className="absolute right-3 top-2 h-6 w-6 font-display text-[18px] leading-none text-ink-faint transition-colors hover:text-ink"
-      >
-        ×
-      </button>
+      {removable && (
+        <button
+          type="button"
+          aria-label="Remove variable"
+          onClick={onRemove}
+          className="absolute right-3 top-2 h-6 w-6 font-display text-[18px] leading-none text-ink-faint transition-colors hover:text-ink"
+        >
+          ×
+        </button>
+      )}
 
       {/* § IV badge line (linked variables only) */}
       {(linkedLabel !== undefined || linkedBroken) && (

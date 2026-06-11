@@ -24,6 +24,7 @@ import { render, screen, fireEvent, waitFor, cleanup, act, within } from "@testi
 import { clearMcLinks, addMcLink } from "../../src/renderer/lib/mc-link-store";
 import type { DependencyMap as DMap } from "@decision-forge/core";
 import MonteCarlo from "../../src/renderer/pages/MonteCarlo";
+import { SimulationPanel } from "../../src/renderer/pages/mc/SimulationPanel";
 
 afterEach(() => {
   cleanup();
@@ -538,5 +539,186 @@ describe("B10 – save failure mid-session promotes to ad-hoc", () => {
       await new Promise((r) => setTimeout(r, 50));
     });
     expect(saveMock.mock.calls.length).toBe(callsAfterPromotion);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B11 — Chip click must NOT destroy an unsaved formula draft: the chip edits
+//       ONLY the local draft (parent syncs on Run, as for typing).
+// ---------------------------------------------------------------------------
+describe("B11 – chip click preserves an unsaved formula draft", () => {
+  beforeEach(() => {
+    setupMocks();
+    seedLink();
+  });
+
+  it("typed-but-unrun text survives a chip click, with the varName appended", async () => {
+    render(<MonteCarlo />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(VAR_NAME)).toBeInTheDocument();
+    });
+
+    // Type a draft into the formula textarea — do NOT run
+    const formulaEl = screen.getByLabelText(/outcome formula/i) as HTMLTextAreaElement;
+    fireEvent.change(formulaEl, { target: { value: "revenue - cost + 42" } });
+
+    // Click the chip
+    const chip = await screen.findByRole("button", { name: /use market_demand/i });
+    fireEvent.click(chip);
+
+    // Let any (wrongful) parent → panel sync settle
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    // The typed draft survives AND the varName was appended
+    const after = (screen.getByLabelText(/outcome formula/i) as HTMLTextAreaElement).value;
+    expect(after).toContain("42");
+    expect(after).toContain(VAR_NAME);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B12 — Linked cards must not render a live no-op remove button
+// ---------------------------------------------------------------------------
+describe("B12 – remove button hidden on linked cards, present on ad-hoc", () => {
+  beforeEach(() => {
+    setupMocks();
+    seedLink();
+  });
+
+  it("the linked card has NO remove button; ad-hoc cards still do", async () => {
+    render(<MonteCarlo />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(VAR_NAME)).toBeInTheDocument();
+    });
+
+    // Linked card: no remove button inside
+    const badge = screen.getByText(/§ IV/);
+    const linkedCard = badge.closest(".specimen") as HTMLElement;
+    expect(
+      within(linkedCard).queryByRole("button", { name: /remove variable/i })
+    ).not.toBeInTheDocument();
+
+    // Ad-hoc cards (revenue + cost defaults): both still removable
+    const removeButtons = screen.getAllByRole("button", { name: /remove variable/i });
+    expect(removeButtons).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B13 — Promotion must carry the LATEST optimistic value, not the superseded
+//       edit whose write failed.
+// ---------------------------------------------------------------------------
+describe("B13 – promotion prefers the current optimistic value", () => {
+  it("rapid edits + failing save → promoted card shows the LAST edit", async () => {
+    setupMocks(); // valid map fixture
+    (window as any).api.maps.save = vi.fn().mockRejectedValue(new Error("disk full"));
+    seedLink();
+
+    render(<MonteCarlo />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(VAR_NAME)).toBeInTheDocument();
+    });
+
+    const badge = screen.getByText(/§ IV/);
+    const card = badge.closest(".specimen") as HTMLElement;
+
+    // Two rapid edits: mode 30 then 35 — the first queued write fails and
+    // triggers promotion; the promoted variable must carry 35, not 30.
+    fireEvent.change(within(card).getByLabelText(/c\s+Mode/i), { target: { value: "30" } });
+    fireEvent.change(within(card).getByLabelText(/c\s+Mode/i), { target: { value: "35" } });
+
+    await waitFor(() => {
+      expect(screen.getByText(/link broken/i)).toBeInTheDocument();
+    });
+
+    const brokenCard = screen.getByText(/link broken/i).closest(".specimen") as HTMLElement;
+    expect(
+      (within(brokenCard).getByLabelText(/c\s+Mode/i) as HTMLInputElement).value
+    ).toBe("35");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B14 — Chip "referenced" check uses word boundaries, not substring matching
+// ---------------------------------------------------------------------------
+describe("B14 – chip referenced-check uses word boundaries", () => {
+  const noopRun = vi.fn(async () => ({
+    samples: [], stats: { mean: 0, sd: 0, min: 0, max: 0, p5: 0, p10: 0, p25: 0, p50: 0, p75: 0, p90: 0, p95: 0, p99: 0 }, iterations: 0
+  }));
+
+  it("'cost' IS referenced by 'revenue - cost' → chip hidden", () => {
+    render(
+      <SimulationPanel
+        config={{ variables: [], formula: "revenue - cost", iterations: 100 }}
+        onRun={noopRun}
+        linkedVarNames={["cost"]}
+      />
+    );
+    expect(screen.queryByRole("button", { name: /use cost/i })).not.toBeInTheDocument();
+  });
+
+  it("'x' is NOT hidden by 'max(' — substring must not count as a reference", () => {
+    render(
+      <SimulationPanel
+        config={{ variables: [], formula: "max(1, 2)", iterations: 100 }}
+        onRun={noopRun}
+        linkedVarNames={["x"]}
+      />
+    );
+    expect(screen.getByRole("button", { name: /^use x$/i })).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B15 — Healthy-link load dedups against existing ad-hoc names: a restored
+//       link must not coexist with its promoted twin under one name.
+// ---------------------------------------------------------------------------
+describe("B15 – healthy link skipped when an ad-hoc variable already owns the name", () => {
+  it("link whose varName collides with an ad-hoc default renders only ONE card", async () => {
+    clearMcLinks();
+    // Map node carries varName "revenue" — collides with the default ad-hoc var
+    const map: DMap = {
+      id: MAP_ID,
+      name: "Test map",
+      createdAt: "2026-06-11T00:00:00Z",
+      updatedAt: "2026-06-11T00:00:00Z",
+      nodes: [
+        {
+          id: NODE_ID,
+          label: "Revenue uncertainty",
+          role: "uncertainty",
+          mc: {
+            varName: "revenue",
+            distribution: { kind: "triangular", min: 10, mode: 25, max: 50 },
+          },
+        },
+      ],
+      edges: [],
+    };
+    (window as any).api = {
+      maps: {
+        load: vi.fn().mockResolvedValue(map),
+        save: vi.fn().mockResolvedValue(undefined),
+        list: vi.fn().mockResolvedValue([]),
+        delete: vi.fn().mockResolvedValue(undefined),
+      },
+      mc: { run: vi.fn() },
+    };
+    addMcLink({ mapId: MAP_ID, nodeId: NODE_ID, varName: "revenue" });
+
+    render(<MonteCarlo />);
+
+    const loadMock = (window as any).api.maps.load as ReturnType<typeof vi.fn>;
+    await waitFor(() => expect(loadMock).toHaveBeenCalled());
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    // Exactly one "revenue" card — the ad-hoc one (editable name)
+    const revenueInputs = screen.getAllByDisplayValue("revenue");
+    expect(revenueInputs).toHaveLength(1);
+    expect(revenueInputs[0]).not.toBeDisabled();
   });
 });

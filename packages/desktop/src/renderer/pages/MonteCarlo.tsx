@@ -46,17 +46,25 @@ export default function MonteCarlo() {
   // Cache maps by mapId so we don't re-load the same map repeatedly
   const mapCache = useRef<Map<string, DependencyMap | null>>(new Map());
 
-  // Mirror of linkedMeta for queued write-throughs (avoid stale closures)
+  // Mirrors for queued write-throughs / async load paths (avoid stale closures)
   const linkedMetaRef = useRef(linkedMeta);
   linkedMetaRef.current = linkedMeta;
+  const linkedVarsRef = useRef(linkedVars);
+  linkedVarsRef.current = linkedVars;
+  const variablesRef = useRef(variables);
+  variablesRef.current = variables;
 
   // Single promise chain so write-throughs are SERIALIZED: each load sees the
   // previous save, so rapid successive edits never drop earlier patches.
   const writeQueue = useRef<Promise<void>>(Promise.resolve());
 
   /** Broken link → genuinely ad-hoc: drop from the linked path, append to the
-   *  ad-hoc array (edits stick, feed runs, name editable), flag the note. */
-  function promoteToAdHoc(varName: string, variable: MCVariable) {
+   *  ad-hoc array (edits stick, feed runs, name editable), flag the note.
+   *  Prefers the CURRENT optimistic value over the failing write's payload so
+   *  a superseded edit is never resurrected. */
+  function promoteToAdHoc(varName: string, fallback: MCVariable) {
+    const current =
+      linkedVarsRef.current.find((v) => v.name === varName) ?? fallback;
     setLinkedVars((prev) => prev.filter((v) => v.name !== varName));
     setLinkedMeta((prev) => {
       const next = new Map(prev);
@@ -64,7 +72,7 @@ export default function MonteCarlo() {
       return next;
     });
     setVariables((prev) =>
-      prev.some((v) => v.name === varName) ? prev : [...prev, variable]
+      prev.some((v) => v.name === varName) ? prev : [...prev, current]
     );
     setBrokenNames((prev) => new Set(prev).add(varName));
   }
@@ -103,8 +111,18 @@ export default function MonteCarlo() {
           continue;
         }
 
-        newVars.push({ name: node.mc.varName, distribution: node.mc.distribution });
-        newMeta.set(link.varName, {
+        // Key variable AND meta both off node.mc.varName (the persisted truth);
+        // link.varName could drift from the map file and silently break the
+        // badge + write-through pairing.
+        const varName = node.mc.varName;
+
+        // Dedup against existing ad-hoc names (mirrors the promotion branch):
+        // a restored link must not coexist with its promoted twin under one
+        // name — the ad-hoc variable stays authoritative for this session.
+        if (variablesRef.current.some((v) => v.name === varName)) continue;
+
+        newVars.push({ name: varName, distribution: node.mc.distribution });
+        newMeta.set(varName, {
           mapId: link.mapId,
           nodeId: link.nodeId,
           label: node.label,
@@ -343,11 +361,12 @@ export default function MonteCarlo() {
                 variable={v}
                 onChange={(updated) => updateLinkedVariable(v.name, updated)}
                 onRemove={() => {
-                  // Linked vars cannot be removed from here — do nothing
+                  // unreachable: removable={false} hides the button
                 }}
                 linkedLabel={meta?.label}
                 linkedNote={meta?.note}
                 nameLocked
+                removable={false}
               />
             );
           })}
@@ -389,12 +408,6 @@ export default function MonteCarlo() {
             config={config}
             onRun={handleRun}
             linkedVarNames={linkedVarNames}
-            onInsertLinkedVar={(varName) => {
-              setFormula((prev) => {
-                const trimmed = prev.trim();
-                return trimmed ? `${trimmed} + ${varName}` : varName;
-              });
-            }}
           />
         </div>
       </div>

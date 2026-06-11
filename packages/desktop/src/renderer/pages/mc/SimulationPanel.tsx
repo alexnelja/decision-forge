@@ -76,15 +76,12 @@ function BigStat({
 export function SimulationPanel({
   config,
   onRun,
-  linkedVarNames = [],
-  onInsertLinkedVar
+  linkedVarNames = []
 }: {
   config: MCConfig;
   onRun: (cfg: MCConfig) => Promise<MCRunResult>;
   /** Names of linked (§ IV) variables for the formula-chip affordance. */
   linkedVarNames?: string[];
-  /** Called when the user clicks a "use <varName>" chip — inserts into formula draft. */
-  onInsertLinkedVar?: (varName: string) => void;
 }) {
   const [formula, setFormula] = useState(config.formula);
   const [iterations, setIterations] = useState(config.iterations);
@@ -98,9 +95,11 @@ export function SimulationPanel({
 
   useEffect(() => setFormula(config.formula), [config.formula]);
 
-  /** varNames that are not yet referenced in the current formula draft. */
+  /** varNames that are not yet referenced in the current formula draft.
+   *  Word-boundary match: `x` must not count as referenced inside `max(`.
+   *  varNames satisfy /^[A-Za-z][A-Za-z0-9_]*$/ so no regex escaping needed. */
   const unreferencedLinkedVars = linkedVarNames.filter(
-    (name) => !formula.includes(name)
+    (name) => !new RegExp(`\\b${name}\\b`).test(formula)
   );
 
   // Build histograms over a SHARED x-range so two runs are visually comparable.
@@ -160,9 +159,7 @@ export function SimulationPanel({
         <textarea
           id="mc-formula"
           value={formula}
-          onChange={(e) => {
-            setFormula(e.target.value);
-          }}
+          onChange={(e) => setFormula(e.target.value)}
           rows={2}
           spellCheck={false}
           aria-label="Outcome formula"
@@ -181,13 +178,14 @@ export function SimulationPanel({
                 type="button"
                 aria-label={`use ${name}`}
                 onClick={() => {
-                  // Insert into the local draft first
+                  // The chip edits ONLY the local draft — the parent syncs on
+                  // Run, exactly as for typed edits. (Touching the parent here
+                  // re-triggered the config.formula sync effect and destroyed
+                  // any typed-but-unrun draft.)
                   setFormula((prev) => {
                     const trimmed = prev.trim();
                     return trimmed ? `${trimmed} + ${name}` : name;
                   });
-                  // Also notify parent so it can sync its own formula state
-                  onInsertLinkedVar?.(name);
                 }}
                 className="border border-ink-faint bg-transparent px-2 py-0.5 font-mono text-[10px] tracking-[0.18em] text-ink-dim hover:border-ink hover:text-ink transition-colors"
               >
