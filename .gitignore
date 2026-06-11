@@ -19,3 +19,6 @@ build/
 .claude/
 .worktrees/
 packages/core/tsconfig.tsbuildinfo
+
+# Brainstorming visual companion scratch
+.superpowers/

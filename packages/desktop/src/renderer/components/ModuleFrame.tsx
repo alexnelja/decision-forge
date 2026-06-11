@@ -19,9 +19,16 @@ export function ModuleFrame({
   marginalia,
   children
 }: ModuleFrameProps) {
+  // When no marginalia is provided, use a single-column layout with no max-width cap
+  // so the content (e.g. § IV canvas) can genuinely reach the window's right edge.
+  // When marginalia IS provided (§ I–III), keep the two-column + max-width layout unchanged.
+  const gridClass = marginalia
+    ? "grid grid-cols-[1fr_220px] gap-10 px-12 py-10 max-w-[1180px]"
+    : "grid grid-cols-1 px-12 py-10";
+
   return (
     <section className="flex-1 overflow-auto">
-      <div className="grid grid-cols-[1fr_220px] gap-10 px-12 py-10 max-w-[1180px]">
+      <div className={gridClass}>
         {/* Main column */}
         <article>
           <div className="flex items-center gap-4 mb-6 fade-up">

@@ -41,6 +41,12 @@ declare global {
         clear: () => Promise<void>;
         has: () => Promise<boolean>;
       };
+      maps: {
+        list: () => Promise<Array<{ id: string; name: string }>>;
+        load: (id: string) => Promise<unknown>;
+        save: (map: unknown) => Promise<void>;
+        delete: (id: string) => Promise<void>;
+      };
     };
   }
 }

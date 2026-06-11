@@ -15,16 +15,20 @@
   },
   "dependencies": {
     "@decision-forge/core": "workspace:*",
+    "dagre": "^0.8.5",
     "keytar": "^7.9.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
-    "react-router-dom": "^6.28.0"
+    "react-force-graph-3d": "^1.29.1",
+    "react-router-dom": "^6.28.0",
+    "reactflow": "^11.11.4",
+    "three-spritetext": "^1.10.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
-    "@testing-library/react": "^16.0.0",
     "@testing-library/jest-dom": "^6.5.0",
-    "jsdom": "^25.0.0",
+    "@testing-library/react": "^16.0.0",
+    "@types/dagre": "^0.7.54",
     "@types/node": "^22.0.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
@@ -34,6 +38,7 @@
     "electron": "^34.0.0",
     "esbuild": "^0.24.2",
     "framer-motion": "^11.11.0",
+    "jsdom": "^25.0.0",
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "typescript": "^5.7.0",

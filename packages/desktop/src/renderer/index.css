@@ -17,6 +17,15 @@
   --sec-mc: #c4d82e;
   --sec-nego: #e8582b;
   --sec-forecast: #6fa88a;
+  --sec-depmap: #8f7ae6;
+
+  /* Edge polarity tokens (Task 6) — deliberately aliased to section colours;
+     raw-hex twins for three.js live in depmap/edge-style.ts (PLUS_HEX etc.) */
+  --plus: var(--sec-forecast);
+  --minus: var(--sec-nego);
+
+  /* Shared rule token (used by some components directly) */
+  --paper-rule: #2a2620;
 }
 
 html, body, #root { height: 100%; margin: 0; }
@@ -104,6 +113,12 @@ body::after {
 .focus-ring:focus-visible {
   outline: 1px solid currentColor;
   outline-offset: 4px;
+}
+
+/* Decision Readout rows — hover + keyboard focus parity (no JS DOM mutation) */
+.readout-row:hover,
+.readout-row:focus-visible {
+  background: var(--paper-rule);
 }
 
 /* Small caps, letter-spaced — editorial label */
@@ -233,6 +248,17 @@ body::after {
   border: 1.5px solid currentColor;
   transform: rotate(-4deg);
   opacity: 0.85;
+}
+
+/* ── react-flow marquee selection rectangle ─────────────────────────────── */
+/* Override the stock blue selection box with the depmap palette.             */
+/* .react-flow__selection  = drag-to-select lasso rectangle                  */
+/* .react-flow__nodesselection-rect = the box drawn around selected nodes    */
+.react-flow__selection,
+.react-flow__nodesselection-rect {
+  border: 1px dashed var(--sec-depmap) !important;
+  background: rgba(143, 122, 230, 0.06) !important; /* --sec-depmap at 6% opacity */
+  border-radius: 2px !important;
 }
 
 /* Hairline grid background — graph paper */

@@ -64,9 +64,53 @@ Source of truth: `../docs/superpowers/specs/2026-04-13-decision-forge-design.md`
 - [ ] 3D negotiation table (react-three-fiber) — deferred
 - [ ] SSE streaming of agent turns — deferred (polling works for now)
 
+## Plan 5 — Dependency Map (§ IV) ✅ v1.5 shipped (2026-06-10)
+
+**Design spec:** `docs/superpowers/specs/2026-06-09-dependency-map-design.md`
+**Redesign spec/notes:** `docs/superpowers/specs/2026-06-09-dependency-map-redesign-notes.md`
+**Implementation plan:** `docs/superpowers/plans/2026-06-09-dependency-map-redesign.md`
+
+### v1 shipped (2026-06-09)
+
+- [x] `DependencyMapSchema` + `DependencyNodeSchema` + `DependencyEdgeSchema` in `@decision-forge/core` (Zod, self-loop / dangling-edge guards, v1.1 optional fields reserved)
+- [x] Graph algorithms in `packages/core/src/graph/`: degree + roots/leaves, topological layers (Kahn), cycle detection (Tarjan SCC), reachability, hub ranking, community detection (weakly-connected components), MICMAC influence/dependence quadrants
+- [x] `analyze()` barrel for single-call structural report
+- [x] `mapsDir()` path helper (mirrors `scenariosDir`)
+- [x] JSON-per-map persistence: `packages/desktop/src/main/maps.ts` + IPC handlers registered in `main/index.ts`
+- [x] Preload + renderer-side `mapsApi` (`packages/desktop/src/renderer/lib/maps-api.ts`)
+- [x] § IV route (`/dependency-map`), sidebar nav entry, `ModuleFrame` with depmap accent
+- [x] `CapturePanel` — type + Enter to add factors; click to select; list with active-node highlight
+- [x] `LayeredView` — `reactflow` canvas with `dagre` auto-layout; drag-to-connect edges; nodes coloured by structural role (root / leaf / hub / cycle)
+- [x] `StructurePanel` (marginalia) — roots, leaves, hubs, cycles, MICMAC quadrant for selected node
+- [x] `ConstellationView` — `react-force-graph-3d` (lazy-loaded; three.js split into its own chunk)
+- [x] View toggle: Layered ↔ 3D (aria-pressed)
+- [x] New / Save / Open persistence controls wired to `mapsApi`
+- [x] 7 e2e specs all green (smoke, forecast, mc, nego, nego-batna, scenarios, depmap)
+
+### v1.5 redesign shipped (2026-06-10) — PR #12, branch `feat/dependency-map`
+
+All 8 second-round usability feedback items addressed:
+
+- [x] **T1** — Schema: `node.role` (objective/lever/uncertainty/factor) + `edge.confidence` (known/assumption); drop reserved v1.1 trio (`eac63d5`)
+- [x] **T2** — Core: loop classification reinforcing/balancing + `loopValence` vs objective (`7c19738`)
+- [x] **T3** — Core: `decisionReadout()` — act first / resolve next / plan around (`8d03235`, `1a685bf`)
+- [x] **T4** — Tidy fix: dagre positions applied to react-flow nodes immediately, not just schema (`b531cd1`)
+- [x] **T5** — `FactorNode` — Easy Connect (full-perimeter source handles), double-click-add, drag-from-border→new connected node, inline rename, hover mini-toolbar, ⌘D duplicate, context menus, empty-state hint (`8c46ff1` + fixes)
+- [x] **T6** — Editable connectors: `EdgeToolbar` (flip / sign cycle / confidence toggle / delete / re-point), polarity colours (`var(--plus)` green / `var(--minus)` red), assumption dashes (`fda243f`, `409e22d`)
+- [x] **T7** — Decision Readout panel (marginalia): ACT FIRST / RESOLVE NEXT / PLAN AROUND rows; role radio in NodeInspector; loop badges overlay on canvas (`5088775`)
+- [x] **T8** — Icon chrome (save/open/new/tidy/layers/cube SVGs, aria-label + title tooltips); collapsible Contents nav (global sidebar, `df.sidebar.pinned`); 3D node labels via `three-spritetext` + polarity-styled links (`0951066`, `d6d28ef`, `cc5014f`, `36fac27`)
+- [x] **T9** — e2e sweep: existing depmap spec fixed (icon button selectors); new comprehensive gesture flow test added; all 8 e2e specs pass (2026-06-10)
+
+**Final test counts:** 77 core · 189 desktop unit · 8 e2e (all green)
+
+### v1.5 deferred
+
+- [ ] DEMATEL-lite leverage scores (total-influence matrix T)
+- [ ] Monte Carlo / Forecast hand-off — link a map node to an MC variable and propagate uncertainty estimates
+
 ## Cross-cutting / Later
 
-- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 6 specs: smoke, forecast, mc, nego, nego-batna, scenarios (all green)
+- [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 8 specs: smoke, forecast, mc, nego, nego-batna, scenarios, depmap (navigate/add), depmap (redesigned gesture flow) — all green (2026-06-10)
 - [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I; MC → BATNA (`{refMCVar, percentile}` in Nego) shipped (Plan 4.5). Reverse direction (forecast → MC param distribution) still open
 - [ ] Visual/interaction polish per design §10
 - [ ] Packaging, code-signing, auto-update
