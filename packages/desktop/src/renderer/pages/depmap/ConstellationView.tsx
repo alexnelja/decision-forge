@@ -127,11 +127,27 @@ export default function ConstellationView({
   }, [selectedId, downstream, upstream]);
 
   /**
-   * nodeThreeObject: returns a SpriteText label positioned below the sphere.
+   * nodeThreeObject: returns a SpriteText label lifted clearly above the sphere.
    * nodeThreeObjectExtend={true} keeps the existing sphere in addition to this
    * extra object.
    *
-   * textHeight ≈ 4 gives readable but compact labels at the default camera distance.
+   * Geometry reasoning for the Y offset:
+   *   react-force-graph-3d default nodeVal = 1, nodeRelSize = 4.
+   *   Sphere radius = Math.cbrt(nodeVal) * nodeRelSize = 1 * 4 = 4 world units.
+   *   textHeight = 4, so the sprite half-height ≈ 2 world units.
+   *   A 1-unit clear gap between sphere top and label bottom gives:
+   *     yOffset = sphereRadius + spriteHalfHeight + gap = 4 + 2 + 1 = 7
+   *   We set sprite.position.y = 7 (positive Y = upward in Three.js).
+   *
+   * Why sprite.position.y and NOT sprite.offsetY:
+   *   three-spritetext's `offsetY` shifts the billboard texture within the
+   *   sprite's UV space — it is not a Three.js world-space translation and
+   *   react-force-graph-3d ignores it for layout. Setting `position.y` directly
+   *   is the reliable world-space lift and works correctly with nodeThreeObjectExtend.
+   *
+   * The previous code used `sprite.offsetY = -8` (a downward UV shift), which
+   * moved the label *into* the sphere rather than above it — that was the bug.
+   *
    * material.depthWrite = false prevents z-fighting with sphere surfaces.
    * --ink (#f1ece0) matches the cream foreground colour used throughout the UI.
    */
@@ -140,9 +156,11 @@ export default function ConstellationView({
     const sprite = new SpriteText(label);
     sprite.textHeight = 4;
     sprite.color = INK_COLOR;
-    // SpriteText uses offsetY (its own API) for vertical offset relative to the
-    // attachment point. Negative value moves the label downward.
-    sprite.offsetY = -8;
+    // Lift the label above the sphere in world space.
+    // sphereRadius(4) + spriteHalfHeight(2) + gap(1) = 7 world units upward.
+    // `position` is inherited from THREE.Object3D at runtime but SpriteText's
+    // bundled .d.ts does not re-export it — same narrow-cast pattern as `material`.
+    (sprite as unknown as { position: { y: number } }).position.y = 7;
     // Prevent z-fighting with sphere surfaces. `material` is inherited from
     // THREE.Sprite at runtime, but three@0.184 ships no bundled .d.ts and
     // @types/three is not installed, so the base class is typeless to tsc —
