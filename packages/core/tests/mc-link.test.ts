@@ -11,11 +11,22 @@ describe("mcVarName", () => {
     const taken = new Set(["demand", "demand_2"]);
     expect(mcVarName("Demand", taken)).toBe("demand_3");
   });
-  it("falls back to v_ for an all-symbol label", () =>
-    expect(mcVarName("???", new Set())).toMatch(/^v_?/));
+  it("falls back to v for an all-symbol label", () =>
+    expect(mcVarName("???", new Set())).toBe("v"));
   it("always satisfies the MCVariable name regex", () => {
     for (const label of ["3rd", "—", "a b", "_x", "9", "Ünïcode label"])
       expect(mcVarName(label, new Set())).toMatch(/^[A-Za-z][A-Za-z0-9_]*$/);
+  });
+
+  // Reserved words — Python keywords and the py-engine evaluator's safe
+  // globals would break or shadow formula evaluation; suffix with _.
+  it("suffixes Python keywords (Lambda → lambda_)", () =>
+    expect(mcVarName("Lambda", new Set())).toBe("lambda_"));
+  it("suffixes evaluator safe globals (max → max_)", () =>
+    expect(mcVarName("max", new Set())).toBe("max_"));
+  it("dedups a reserved name correctly when taken", () => {
+    const taken = new Set(["lambda_"]);
+    expect(mcVarName("Lambda", taken)).toBe("lambda__2");
   });
 });
 
