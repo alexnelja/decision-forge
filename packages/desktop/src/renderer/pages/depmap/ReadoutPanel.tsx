@@ -13,7 +13,7 @@
  */
 
 import type { DependencyMap, Readout } from "@decision-forge/core";
-import { roleGlyph } from "./roles";
+import { ROLE_OPTIONS, roleGlyph } from "./roles";
 
 export interface ReadoutPanelProps {
   map: DependencyMap;
@@ -72,19 +72,51 @@ export function ReadoutPanel({ map, readout, onSelect }: ReadoutPanelProps) {
         Decision Readout
       </div>
 
-      {/* Guidance copy — shown when roles are missing */}
+      {/* Guidance copy + role legend — shown when roles are missing */}
       {guidance && (
-        <p
-          style={{
-            fontSize: "11px",
-            color: "var(--ink-dim)",
-            lineHeight: 1.5,
-            marginBottom: hasPlanAround ? "10px" : "0",
-            fontStyle: "italic",
-          }}
-        >
-          {guidance}
-        </p>
+        <>
+          <p
+            style={{
+              fontSize: "11px",
+              color: "var(--ink-dim)",
+              lineHeight: 1.5,
+              marginBottom: "8px",
+              fontStyle: "italic",
+            }}
+          >
+            {guidance}
+          </p>
+          {/* Compact legend: one line per role with glyph + description.
+              Only shown here (the learning moment); disappears once roles exist
+              and guidance clears. */}
+          <div
+            style={{
+              marginBottom: hasPlanAround ? "10px" : "0",
+              display: "flex",
+              flexDirection: "column",
+              gap: "3px",
+            }}
+          >
+            {ROLE_OPTIONS.filter((o) => o.glyph).map((opt) => (
+              <div
+                key={opt.value}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "5px",
+                  fontSize: "10px",
+                  color: "var(--ink-faint)",
+                  lineHeight: 1.4,
+                }}
+              >
+                <span aria-hidden="true" style={{ flexShrink: 0, width: "12px", textAlign: "center" }}>
+                  {opt.glyph}
+                </span>
+                <span>{opt.description}</span>
+              </div>
+            ))}
+          </div>
+        </>
       )}
 
       {/* ACT FIRST section */}

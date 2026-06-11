@@ -183,6 +183,7 @@ function NodeMenuItems(props: NodeContextMenuProps) {
         <MenuItem
           key={opt.value}
           label={opt.label}
+          title={opt.description}
           onClick={() => { onSetRole(nodeId, opt.value); onClose(); }}
           indent
         />
@@ -267,11 +268,13 @@ function EdgeMenuItems(props: EdgeContextMenuProps) {
 
 function MenuItem({
   label,
+  title,
   onClick,
   indent = false,
   danger = false,
 }: {
   label: string;
+  title?: string;
   onClick: () => void;
   indent?: boolean;
   danger?: boolean;
@@ -280,6 +283,7 @@ function MenuItem({
     <button
       role="menuitem"
       onClick={onClick}
+      title={title}
       style={{
         display: "block",
         width: "100%",

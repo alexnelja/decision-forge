@@ -213,13 +213,12 @@ export function NodeInspector({ node, onUpdate, onDelete, onClose }: NodeInspect
             return (
               <label
                 key={opt.value}
+                title={opt.description}
                 style={{
                   display: "flex",
-                  alignItems: "center",
+                  alignItems: "flex-start",
                   gap: "6px",
                   cursor: "pointer",
-                  fontSize: "12px",
-                  color: "var(--ink)",
                   fontFamily: "var(--font-display, inherit)",
                 }}
               >
@@ -230,9 +229,22 @@ export function NodeInspector({ node, onUpdate, onDelete, onClose }: NodeInspect
                   checked={checked}
                   aria-label={opt.label}
                   onChange={() => onUpdate(node.id, { role: opt.value })}
-                  style={{ accentColor: "var(--sec-depmap, #8b7cf8)" }}
+                  style={{ accentColor: "var(--sec-depmap, #8b7cf8)", marginTop: "2px", flexShrink: 0 }}
                 />
-                {opt.label}
+                <span>
+                  <span style={{ fontSize: "12px", color: "var(--ink)" }}>{opt.label}</span>
+                  <span
+                    style={{
+                      display: "block",
+                      fontSize: "10px",
+                      color: "var(--ink-faint)",
+                      lineHeight: 1.4,
+                      marginTop: "1px",
+                    }}
+                  >
+                    {opt.description}
+                  </span>
+                </span>
               </label>
             );
           })}

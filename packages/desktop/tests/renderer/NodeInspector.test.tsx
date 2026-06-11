@@ -176,3 +176,38 @@ describe("NodeInspector — role radio", () => {
     expect(onUpdate).toHaveBeenCalledWith(levNode.id, { role: "factor" });
   });
 });
+
+// ---------------------------------------------------------------------------
+// Role descriptions — Fix 2: plain-language descriptions shown in inspector
+// ---------------------------------------------------------------------------
+
+describe("NodeInspector — role descriptions", () => {
+  it("shows a description for the Objective role", () => {
+    render(
+      <NodeInspector node={node} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    // The description for objective must be in the DOM (somewhere in/near the radio group)
+    expect(screen.getByText(/outcome you.re deciding for/i)).toBeInTheDocument();
+  });
+
+  it("shows a description for the Lever role", () => {
+    render(
+      <NodeInspector node={node} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    expect(screen.getByText(/directly act on or change/i)).toBeInTheDocument();
+  });
+
+  it("shows a description for the Uncertainty role", () => {
+    render(
+      <NodeInspector node={node} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    expect(screen.getByText(/unknown that will resolve/i)).toBeInTheDocument();
+  });
+
+  it("shows a description for the Factor role", () => {
+    render(
+      <NodeInspector node={node} onUpdate={vi.fn()} onDelete={vi.fn()} onClose={vi.fn()} />
+    );
+    expect(screen.getByText(/thing that matters/i)).toBeInTheDocument();
+  });
+});

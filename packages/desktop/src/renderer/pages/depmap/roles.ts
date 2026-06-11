@@ -13,13 +13,15 @@ export interface RoleOption {
   label: string;
   /** Unicode glyph displayed on nodes and in the ReadoutPanel. */
   glyph: string;
+  /** Plain-language explanation shown in inspector, menu tooltips, and readout legend. */
+  description: string;
 }
 
 export const ROLE_OPTIONS: RoleOption[] = [
-  { value: "factor",      label: "Factor (default)", glyph: "" },
-  { value: "objective",   label: "◎ Objective",      glyph: "◎" },
-  { value: "lever",       label: "◆ Lever",           glyph: "◆" },
-  { value: "uncertainty", label: "? Uncertainty",     glyph: "?" },
+  { value: "factor",      label: "Factor (default)", glyph: "",  description: "A thing that matters in this decision (default)." },
+  { value: "objective",   label: "◎ Objective",      glyph: "◎", description: "The outcome you're deciding for — what success means." },
+  { value: "lever",       label: "◆ Lever",           glyph: "◆", description: "Something you can directly act on or change." },
+  { value: "uncertainty", label: "? Uncertainty",     glyph: "?", description: "An unknown that will resolve over time — watch or hedge." },
 ];
 
 /**

@@ -307,6 +307,64 @@ describe("ReadoutPanel — full roles", () => {
 // PLAN AROUND — loop items (⟳ reinforcing / ⇋ balancing)
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Fix 2: Guidance legend — role glyph + description shown when guidance present
+// ---------------------------------------------------------------------------
+
+describe("ReadoutPanel — guidance legend (role descriptions)", () => {
+  it("shows all four role glyphs in the legend when guidance is shown", () => {
+    const map = makeNoRoleMap();
+    const readout = decisionReadout(map);
+
+    render(
+      <ReadoutPanel map={map} readout={readout} onSelect={vi.fn()} />
+    );
+
+    // Guidance must be present for the legend to show
+    expect(readout.guidance).toBeTruthy();
+    // Each role glyph appears at least once (the guidance string also contains them,
+    // so use getAllByText — we just need the legend spans to be present too).
+    expect(screen.getAllByText(/◎/).length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText(/◆/).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("legend shows description text for objective", () => {
+    const map = makeNoRoleMap();
+    const readout = decisionReadout(map);
+
+    render(
+      <ReadoutPanel map={map} readout={readout} onSelect={vi.fn()} />
+    );
+
+    expect(screen.getByText(/outcome you.re deciding for/i)).toBeInTheDocument();
+  });
+
+  it("legend shows description text for lever", () => {
+    const map = makeNoRoleMap();
+    const readout = decisionReadout(map);
+
+    render(
+      <ReadoutPanel map={map} readout={readout} onSelect={vi.fn()} />
+    );
+
+    expect(screen.getByText(/directly act on or change/i)).toBeInTheDocument();
+  });
+
+  it("legend does NOT show when guidance is absent (roles are set)", () => {
+    const map = makeFullRoleMap();
+    const readout = decisionReadout(map);
+
+    render(
+      <ReadoutPanel map={map} readout={readout} onSelect={vi.fn()} />
+    );
+
+    // No guidance → no legend copy
+    expect(readout.guidance).toBeFalsy();
+    // The legend description text must not appear
+    expect(screen.queryByText(/outcome you.re deciding for/i)).not.toBeInTheDocument();
+  });
+});
+
 describe("ReadoutPanel — PLAN AROUND loops", () => {
   it("shows ⟳ reinforcing label for a reinforcing cycle with node labels", () => {
     const map = makeCyclicMap();
