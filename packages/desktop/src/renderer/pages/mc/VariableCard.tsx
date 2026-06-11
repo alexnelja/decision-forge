@@ -309,12 +309,24 @@ export function VariableCard({
   variable,
   onChange,
   onRemove,
-  index
+  index,
+  linkedLabel,
+  linkedNote,
+  linkedBroken,
+  nameLocked
 }: {
   variable: MCVariable;
   onChange: (v: MCVariable) => void;
   onRemove: () => void;
   index?: number;
+  /** If set, renders the § IV badge line. */
+  linkedLabel?: string;
+  /** Node note shown as a hint line below the badge. */
+  linkedNote?: string;
+  /** True when the map file could not be loaded — badge replaced with broken-link note. */
+  linkedBroken?: boolean;
+  /** When true, the name input is disabled (persisted in map + formulas). */
+  nameLocked?: boolean;
 }) {
   const idPrefix = useId();
   const accent = "var(--sec-mc, #c4d82e)";
@@ -326,7 +338,7 @@ export function VariableCard({
       {/* Corner index + remove */}
       <div className="absolute left-4 top-3 flex items-baseline gap-2 font-mono text-[9px] uppercase tracking-[0.3em] text-ink-dim">
         <span>{idx}</span>
-        <span className="text-ink-faint">·</span>
+        {idx && <span className="text-ink-faint">·</span>}
         <span>{kindLong(variable.distribution.kind)}</span>
       </div>
       <button
@@ -338,12 +350,31 @@ export function VariableCard({
         ×
       </button>
 
+      {/* § IV badge line (linked variables only) */}
+      {(linkedLabel !== undefined || linkedBroken) && (
+        <div className="mt-6 mb-1">
+          {linkedBroken ? (
+            <span className="font-mono text-[10px] tracking-[0.18em] text-[color:var(--sec-nego,#e8582b)]">
+              link broken — now ad-hoc
+            </span>
+          ) : (
+            <span className="font-mono text-[10px] tracking-[0.18em] text-ink-dim">
+              § IV · {linkedLabel}
+            </span>
+          )}
+          {linkedNote && !linkedBroken && (
+            <p className="mt-0.5 font-mono text-[10px] italic text-ink-faint">{linkedNote}</p>
+          )}
+        </div>
+      )}
+
       {/* Name — big serif */}
-      <div className="mt-6">
+      <div className={(linkedLabel !== undefined || linkedBroken) ? "mt-2" : "mt-6"}>
         <input
           value={variable.name}
-          onChange={(e) => onChange({ ...variable, name: e.target.value })}
-          className="w-full bg-transparent font-display text-[28px] leading-none text-ink focus:outline-none"
+          onChange={(e) => !nameLocked && onChange({ ...variable, name: e.target.value })}
+          disabled={nameLocked}
+          className="w-full bg-transparent font-display text-[28px] leading-none text-ink focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
           style={{ fontVariationSettings: '"opsz" 44, "SOFT" 20, "wght" 380', letterSpacing: "-0.015em" }}
           spellCheck={false}
         />

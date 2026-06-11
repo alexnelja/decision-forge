@@ -75,10 +75,16 @@ function BigStat({
 
 export function SimulationPanel({
   config,
-  onRun
+  onRun,
+  linkedVarNames = [],
+  onInsertLinkedVar
 }: {
   config: MCConfig;
   onRun: (cfg: MCConfig) => Promise<MCRunResult>;
+  /** Names of linked (§ IV) variables for the formula-chip affordance. */
+  linkedVarNames?: string[];
+  /** Called when the user clicks a "use <varName>" chip — inserts into formula draft. */
+  onInsertLinkedVar?: (varName: string) => void;
 }) {
   const [formula, setFormula] = useState(config.formula);
   const [iterations, setIterations] = useState(config.iterations);
@@ -91,6 +97,11 @@ export function SimulationPanel({
   const [runCount, setRunCount] = useState(0);
 
   useEffect(() => setFormula(config.formula), [config.formula]);
+
+  /** varNames that are not yet referenced in the current formula draft. */
+  const unreferencedLinkedVars = linkedVarNames.filter(
+    (name) => !formula.includes(name)
+  );
 
   // Build histograms over a SHARED x-range so two runs are visually comparable.
   const sharedRange = useMemo(() => {
@@ -149,7 +160,9 @@ export function SimulationPanel({
         <textarea
           id="mc-formula"
           value={formula}
-          onChange={(e) => setFormula(e.target.value)}
+          onChange={(e) => {
+            setFormula(e.target.value);
+          }}
           rows={2}
           spellCheck={false}
           aria-label="Outcome formula"
@@ -159,6 +172,30 @@ export function SimulationPanel({
             letterSpacing: "-0.015em"
           }}
         />
+        {/* "use <varName>" chips for linked variables not yet in the formula */}
+        {unreferencedLinkedVars.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {unreferencedLinkedVars.map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-label={`use ${name}`}
+                onClick={() => {
+                  // Insert into the local draft first
+                  setFormula((prev) => {
+                    const trimmed = prev.trim();
+                    return trimmed ? `${trimmed} + ${name}` : name;
+                  });
+                  // Also notify parent so it can sync its own formula state
+                  onInsertLinkedVar?.(name);
+                }}
+                className="border border-ink-faint bg-transparent px-2 py-0.5 font-mono text-[10px] tracking-[0.18em] text-ink-dim hover:border-ink hover:text-ink transition-colors"
+              >
+                use {name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Run button + iterations */}
