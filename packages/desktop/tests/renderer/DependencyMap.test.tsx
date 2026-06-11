@@ -1527,7 +1527,10 @@ describe("Floating overlay panel — presence, collapse, localStorage persistenc
     );
     const toggleBtn = screen.getByTestId("depmap-panel-toggle");
     fireEvent.click(toggleBtn);
-    expect(toggleBtn).toHaveAttribute("aria-label", "Expand side panel");
+    // After collapse the panel re-renders a different DOM element (the slim tab);
+    // re-query by testid rather than reusing the stale pre-click reference.
+    const collapsedBtn = screen.getByTestId("depmap-panel-toggle");
+    expect(collapsedBtn).toHaveAttribute("aria-label", "Expand side panel");
   });
 
   it("clicking toggle twice returns panel to open state", () => {
@@ -1602,5 +1605,100 @@ describe("Floating overlay panel — presence, collapse, localStorage persistenc
     if (aside) {
       expect(aside.querySelector("[data-testid='depmap-panel-toggle']")).toBeNull();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 2: Blur-discard on fresh "New factor" nodes (click-away during initial
+// naming must NOT litter phantom nodes when the user never typed anything).
+//
+// Rule:
+//   fresh node + blur + value still === "New factor" → cancel (node deleted)
+//   fresh node + blur + value !== "New factor"       → commit (node kept)
+// ---------------------------------------------------------------------------
+describe("Blur-discard: click-away on untouched fresh node removes it", () => {
+  it("double-click pane → input appears → blur without typing → NO node remains", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    // Double-click the empty pane → fresh node with input showing "New factor"
+    const pane = container.querySelector(".react-flow__pane")!;
+    fireEvent.doubleClick(pane);
+
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).toBeInTheDocument();
+    });
+
+    // Verify the seeded default is "New factor"
+    const renameInput = container.querySelector(".react-flow__node input") as HTMLInputElement;
+    expect(renameInput.value).toBe("New factor");
+
+    // Blur without changing the value (user clicked elsewhere)
+    fireEvent.blur(renameInput);
+
+    // Fresh node with untouched default must be deleted — no nodes remain
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(0);
+    });
+  });
+
+  it("double-click pane → type 'X' → blur → node 'X' exists", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    const pane = container.querySelector(".react-flow__pane")!;
+    fireEvent.doubleClick(pane);
+
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).toBeInTheDocument();
+    });
+
+    // Type something different — blur should COMMIT this label
+    const renameInput = container.querySelector(".react-flow__node input") as HTMLInputElement;
+    fireEvent.change(renameInput, { target: { value: "X" } });
+    fireEvent.blur(renameInput);
+
+    // Node with label "X" must exist
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    });
+    // The CapturePanel list also shows "X" once committed
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "X" })).toBeInTheDocument();
+    });
+  });
+
+  it("Enter on untouched default still commits (explicit confirm keeps the node)", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    const pane = container.querySelector(".react-flow__pane")!;
+    fireEvent.doubleClick(pane);
+
+    await waitFor(() => {
+      expect(container.querySelector(".react-flow__node input")).toBeInTheDocument();
+    });
+
+    // Press Enter without changing the value — explicit confirm keeps the node
+    const renameInput = container.querySelector(".react-flow__node input") as HTMLInputElement;
+    expect(renameInput.value).toBe("New factor");
+    fireEvent.keyDown(renameInput, { key: "Enter" });
+
+    // Node must survive with label "New factor"
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBe(1);
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "New factor" })).toBeInTheDocument();
+    });
   });
 });

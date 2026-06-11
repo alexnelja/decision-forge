@@ -715,6 +715,7 @@ export default function DependencyMap() {
               map={map}
               selectedId={selectedId}
               renamingId={renamingId}
+              freshNodeIdsRef={freshNodeIds}
               onSelect={setSelectedId}
               onAddEdge={handleAddEdge}
               analysis={analysis}
@@ -775,7 +776,14 @@ export default function DependencyMap() {
            *  / Tidy (10), but below context menus (portalled to body, typically
            *  z:50+) and the open-map dialog (z:50).
            *  backdrop-filter blur gives the frosted-glass effect requested.
-           *  Collapsed: only the toggle rail (24px) is shown; panel body is hidden.
+           *
+           *  OPEN: the panel is a frosted-glass card with the toggle embedded in
+           *  its own slim header row — the toggle is visually attached to the panel,
+           *  never floating disconnected above it.
+           *
+           *  COLLAPSED: a slim 22px-wide vertical tab docked flush to the canvas's
+           *  right edge (right:0, no overflow). The ○ glyph is centred inside the
+           *  tab with a writing-mode rotation so it stays readable.
            ────────────────────────────────────────────────────────────────── */}
           <div
             data-testid="depmap-overlay-panel"
@@ -784,66 +792,111 @@ export default function DependencyMap() {
               top: "40px",
               right: "0",
               zIndex: 20,
-              width: panelPinned ? "310px" : "24px",
               maxHeight: "calc(100% - 48px)",
               display: "flex",
               flexDirection: "column",
-              transition: "width 0.22s ease",
-              overflow: "hidden",
+              alignItems: "flex-end",
             }}
           >
-            {/* Toggle tab — always visible on the left edge of the panel */}
-            <button
-              onClick={togglePanelPinned}
-              title={panelPinned ? "Collapse side panel" : "Expand side panel"}
-              aria-label={panelPinned ? "Collapse side panel" : "Expand side panel"}
-              data-testid="depmap-panel-toggle"
-              style={{
-                alignSelf: "flex-start",
-                background: panelPinned ? "var(--sec-depmap)" : "var(--paper-raised)",
-                border: "1px solid var(--paper-rule)",
-                borderRadius: "3px",
-                color: panelPinned ? "#fff" : "var(--ink-dim)",
-                fontSize: "9px",
-                padding: "8px",
-                cursor: "pointer",
-                lineHeight: 1,
-                marginBottom: "4px",
-                transition: "background 0.15s, color 0.15s",
-                flexShrink: 0,
-              }}
-            >
-              {panelPinned ? "●" : "○"}
-            </button>
-
-            {/* Panel body — only shown when pinned open */}
-            {panelPinned && (
+            {panelPinned ? (
+              /* ── OPEN state: panel card with integrated header row ── */
               <div
                 style={{
-                  flex: 1,
-                  overflowY: "auto",
+                  display: "flex",
+                  flexDirection: "column",
+                  width: "310px",
+                  maxHeight: "calc(100vh - 48px - 40px)",
                   background: "rgba(21, 19, 15, 0.88)",
                   backdropFilter: "blur(6px)",
                   WebkitBackdropFilter: "blur(6px)",
                   borderLeft: "1px solid var(--paper-rule)",
+                  borderBottom: "1px solid var(--paper-rule)",
                   borderRadius: "0 0 0 6px",
                   boxShadow: "-4px 4px 20px rgba(0,0,0,0.35)",
-                  padding: "12px 14px",
                 }}
               >
-                <ReadoutPanel
-                  map={map}
-                  readout={analysis.readout}
-                  onSelect={setSelectedId}
-                />
-                <NodeInspector
-                  node={selectedNode}
-                  onUpdate={handleUpdateNode}
-                  onDelete={handleDeleteNode}
-                  onClose={() => setSelectedId(null)}
-                />
-                <StructurePanel map={map} selectedId={selectedId} />
+                {/* Header row: slim bar housing the collapse toggle */}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                    padding: "4px 6px",
+                    borderBottom: "1px solid var(--paper-rule)",
+                    flexShrink: 0,
+                  }}
+                >
+                  <button
+                    onClick={togglePanelPinned}
+                    title="Collapse side panel"
+                    aria-label="Collapse side panel"
+                    data-testid="depmap-panel-toggle"
+                    style={{
+                      background: "var(--sec-depmap)",
+                      border: "1px solid var(--paper-rule)",
+                      borderRadius: "3px",
+                      color: "#fff",
+                      fontSize: "9px",
+                      padding: "4px 6px",
+                      cursor: "pointer",
+                      lineHeight: 1,
+                      transition: "background 0.15s, color 0.15s",
+                    }}
+                  >
+                    ●
+                  </button>
+                </div>
+
+                {/* Panel body */}
+                <div
+                  style={{
+                    flex: 1,
+                    overflowY: "auto",
+                    padding: "12px 14px",
+                  }}
+                >
+                  <ReadoutPanel
+                    map={map}
+                    readout={analysis.readout}
+                    onSelect={setSelectedId}
+                  />
+                  <NodeInspector
+                    node={selectedNode}
+                    onUpdate={handleUpdateNode}
+                    onDelete={handleDeleteNode}
+                    onClose={() => setSelectedId(null)}
+                  />
+                  <StructurePanel map={map} selectedId={selectedId} />
+                </div>
               </div>
+            ) : (
+              /* ── COLLAPSED state: slim vertical tab flush to right edge ── */
+              <button
+                onClick={togglePanelPinned}
+                title="Expand side panel"
+                aria-label="Expand side panel"
+                data-testid="depmap-panel-toggle"
+                style={{
+                  width: "22px",
+                  padding: "10px 0",
+                  background: "var(--paper-raised)",
+                  border: "1px solid var(--paper-rule)",
+                  borderRight: "none",
+                  borderRadius: "4px 0 0 4px",
+                  color: "var(--ink-dim)",
+                  fontSize: "9px",
+                  cursor: "pointer",
+                  lineHeight: 1,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  transition: "background 0.15s, color 0.15s",
+                  writingMode: "vertical-rl",
+                  letterSpacing: "0.08em",
+                }}
+              >
+                ○
+              </button>
             )}
           </div>
         </div>

@@ -33,10 +33,20 @@ import { roleGlyph } from "./roles";
 // Types
 // ---------------------------------------------------------------------------
 
+// The default label seeded into a fresh node's rename input.
+// Must match the value used in DependencyMap.handleAddNodeAt / handleAddConnectedNodeAt.
+export const FRESH_NODE_DEFAULT_LABEL = "New factor";
+
 export interface FactorNodeData {
   label: string;
   role?: "objective" | "lever" | "uncertainty" | "factor";
   renaming?: boolean;
+  /** True when this node was just created and has never been successfully named.
+   *  Used by the blur handler: if the user clicks away without typing anything
+   *  (draftLabel still equals FRESH_NODE_DEFAULT_LABEL), treat it as a cancel
+   *  instead of a commit so phantom "New factor" nodes are never left behind.
+   *  Enter still commits even on the default label (explicit user confirmation). */
+  isFresh?: boolean;
   // visual flags
   isSelected?: boolean;
   isCycle?: boolean;
@@ -200,6 +210,20 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
     data.onCancelRename(id);
   }, [id, data]);
 
+  /**
+   * Blur-discard for fresh nodes: if the user clicks away from a brand-new node
+   * without changing the seeded default label, treat it as a cancel (delete the
+   * node) rather than committing a generic "New factor" placeholder.
+   * This fires only from the onBlur handler — Enter always commits (explicit).
+   */
+  const handleBlur = useCallback(() => {
+    if (data.isFresh && draftLabel === FRESH_NODE_DEFAULT_LABEL) {
+      cancelRename();
+    } else {
+      commitRename();
+    }
+  }, [data.isFresh, draftLabel, cancelRename, commitRename]);
+
   const handleInputKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLInputElement>) => {
       e.stopPropagation(); // prevent react-flow from capturing Delete/Backspace
@@ -333,7 +357,7 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
             value={draftLabel}
             onChange={(e) => setDraftLabel(e.target.value)}
             onKeyDown={handleInputKeyDown}
-            onBlur={commitRename}
+            onBlur={handleBlur}
             style={{
               background: "transparent",
               border: "none",

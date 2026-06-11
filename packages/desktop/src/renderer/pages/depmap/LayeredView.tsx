@@ -61,6 +61,9 @@ export interface LayeredViewProps {
   map: DependencyMap;
   selectedId: string | null;
   renamingId?: string | null;
+  /** Ref to the set of fresh node ids (never-successfully-named).
+   *  Read as `.current` inside effects — the ref object is stable. */
+  freshNodeIdsRef: React.RefObject<Set<string>>;
   onSelect: (id: string) => void;
   onAddEdge: (from: string, to: string) => void;
   analysis: Analysis;
@@ -133,6 +136,7 @@ function LayeredViewInner({
   map,
   selectedId,
   renamingId = null,
+  freshNodeIdsRef,
   onSelect,
   onAddEdge,
   analysis,
@@ -345,6 +349,11 @@ function LayeredViewInner({
             label: mapNode?.label ?? n.data.label,
             role: mapNode?.role ?? n.data.role,
             renaming: id === renamingId,
+            // isFresh: true only while this node has never been successfully named
+            // AND is in rename mode with the seeded default label.  The FactorNode
+            // blur handler uses this to distinguish "user clicked away without typing"
+            // (cancel → delete) from "user typed something" (commit → keep).
+            isFresh: (freshNodeIdsRef.current?.has(id) ?? false) && id === renamingId,
             isSelected,
             isCycle,
             isRoot,
@@ -411,7 +420,10 @@ function LayeredViewInner({
         };
       })
     );
-  }, [analysis, selectedId, hoveredId, map, renamingId, onRenameNode, onCancelRename, duplicateNode, onDeleteNode]);
+  // freshNodeIdsRef is a stable ref object — it is safe to include in deps
+  // (the ref object identity never changes; only .current changes, which is
+  // read inside the effect body rather than captured in the closure).
+  }, [analysis, selectedId, hoveredId, map, renamingId, freshNodeIdsRef, onRenameNode, onCancelRename, duplicateNode, onDeleteNode]);
 
   // ── Handlers ────────────────────────────────────────────────────────────
 
