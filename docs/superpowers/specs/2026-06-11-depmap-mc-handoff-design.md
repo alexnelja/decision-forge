@@ -32,7 +32,7 @@ mc: z.object({
   /** Derived from `distribution` whenever it changes (client-side sampling). */
   summary: z.object({
     p10: z.number(), p50: z.number(), p90: z.number(), mean: z.number(),
-    definedAt: iso
+    definedAt: iso  // note: `iso` is file-local in dependency-map.ts — reuse it there
   }).optional()
 }).optional()
 ```
@@ -54,14 +54,24 @@ context menu.
 On activation:
 1. If `node.mc` is absent, seed it: triangular distribution stub
    (min/mode/max unset-but-editable — concretely `{kind:"triangular", min:0,
-   mode:0, max:0}` flagged as unconfigured until § I edits land; § I shows it
-   as an empty editor, not as a real 0/0/0 spike), `varName` slugified from the
-   label (`"Transnet tender"` → `transnet_tender`), de-duplicated against other
-   linked nodes in the map (`_2` suffix).
+   mode:0, max:0}`, which passes the schema; "unconfigured" is a separate
+   predicate `isUnconfigured(dist)` — all-zero triangular — NOT a validation
+   failure; § I shows it as an empty editor, not as a real 0/0/0 spike).
+   `varName` is slugified from the label and **must satisfy
+   `MCVariableSchema.name`'s `/^[A-Za-z][A-Za-z0-9_]*$/`** — the slug helper
+   prepends `v_` when the first character is non-alphabetic
+   (`"Transnet tender"` → `transnet_tender`; `"3rd party risk"` →
+   `v_3rd_party_risk`), and de-duplicates against other linked nodes in the
+   map (`_2` suffix). That regex is the helper's contract; test digit-leading
+   and symbol-leading labels explicitly.
 2. Save the map (unsaved new maps save first — existing `handleSave` path).
 3. Register the binding `{ mapId, nodeId, varName }` in a new renderer-global
    `mc-link-store.ts` (same subscriber pattern as the existing `mc-store.ts`
-   used by the BATNA linkage).
+   used by the BATNA linkage). The store is in-memory: bindings do NOT survive
+   an app restart — that's fine, because the persisted truth is `node.mc` in
+   the map file; the store is only the "what § I should display/edit right now"
+   signal, re-registered by every "→ Simulate" / "Edit in § I" click. Opening
+   § I cold (no binding) shows only ad-hoc variables, as today.
 4. Navigate to `/mc` (react-router `useNavigate`; HashRouter already in place).
 
 ## 4. § I side (MonteCarlo page)
