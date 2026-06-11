@@ -101,7 +101,9 @@ export default function ConstellationView({
   // edgeConfMap is not needed since linkLineDash is absent from the 3D type API.
 
   const graphData = useMemo(() => ({
-    nodes: map.nodes.map((n) => ({ id: n.id, name: n.label })),
+    // Carry the node's note as `note` so nodeLabel can show it in the hover
+    // tooltip without duplicating the always-visible SpriteText label.
+    nodes: map.nodes.map((n) => ({ id: n.id, name: n.label, note: n.note ?? "" })),
     links: map.edges.map((e) => ({ source: e.from, target: e.to })),
   }), [map.nodes, map.edges]);
 
@@ -127,40 +129,48 @@ export default function ConstellationView({
   }, [selectedId, downstream, upstream]);
 
   /**
-   * nodeThreeObject: returns a SpriteText label lifted clearly above the sphere.
-   * nodeThreeObjectExtend={true} keeps the existing sphere in addition to this
-   * extra object.
+   * nodeThreeObject: returns a SpriteText label positioned above the sphere via
+   * the sprite's CENTER ANCHOR — the only reliable mechanism with
+   * nodeThreeObjectExtend, because react-force-graph-3d resets the child
+   * object's local position every tick (making sprite.position.y = N a no-op).
    *
-   * Geometry reasoning for the Y offset:
-   *   react-force-graph-3d default nodeVal = 1, nodeRelSize = 4.
-   *   Sphere radius = Math.cbrt(nodeVal) * nodeRelSize = 1 * 4 = 4 world units.
-   *   textHeight = 4, so the sprite half-height ≈ 2 world units.
-   *   A 1-unit clear gap between sphere top and label bottom gives:
-   *     yOffset = sphereRadius + spriteHalfHeight + gap = 4 + 2 + 1 = 7
-   *   We set sprite.position.y = 7 (positive Y = upward in Three.js).
+   * THREE.Sprite center arithmetic (source: three/src/objects/Sprite.js):
+   *   Each corner vertex is at local coords (-0.5, -0.5), (0.5, -0.5), (0.5, 0.5), (-0.5, 0.5).
+   *   The render transform is: alignedPos = (vertex - center + 0.5) * scale
+   *   where scale.y = spriteHeight (= textHeight * lineCount + padding, ≈ textHeight here).
+   *   So the Y screen offset of a vertex from the anchor point (node centre) is:
+   *     offsetY = (vertex.y - center.y + 0.5) * spriteHeight
    *
-   * Why sprite.position.y and NOT sprite.offsetY:
-   *   three-spritetext's `offsetY` shifts the billboard texture within the
-   *   sprite's UV space — it is not a Three.js world-space translation and
-   *   react-force-graph-3d ignores it for layout. Setting `position.y` directly
-   *   is the reliable world-space lift and works correctly with nodeThreeObjectExtend.
+   *   Bottom vertex y = -0.5:
+   *     bottomY = (-0.5 - center.y + 0.5) * H = -center.y * H
    *
-   * The previous code used `sprite.offsetY = -8` (a downward UV shift), which
-   * moved the label *into* the sphere rather than above it — that was the bug.
+   *   We want bottomY > sphereRadius + gap to clear the sphere top:
+   *     -center.y * H > sphereRadius + gap
+   *     -center.y * 4 > 4 + 1   (sphereRadius=4, gap=1)
+   *      center.y < -1.25
    *
-   * material.depthWrite = false prevents z-fighting with sphere surfaces.
-   * --ink (#f1ece0) matches the cream foreground colour used throughout the UI.
+   *   Choosing center.y = -1.5 gives:
+   *     bottom = 1.5 * 4 = 6 wu above node → clears sphere top (4 wu) by 2 wu
+   *     top    = (0.5 + 1.5) * 4 = 8 wu above node
+   *
+   * react-force-graph-3d default: nodeVal = 1, nodeRelSize = 4
+   *   → sphere radius = Math.cbrt(1) * 4 = 4 world units.
+   *
+   * material.depthWrite = false prevents z-fighting with the sphere surface.
+   * --ink (#f1ece0) matches the cream foreground used throughout the UI.
    */
   const nodeThreeObject = useCallback((node: { id?: string | number; name?: string }) => {
     const label = String(node.name ?? node.id ?? "");
     const sprite = new SpriteText(label);
     sprite.textHeight = 4;
     sprite.color = INK_COLOR;
-    // Lift the label above the sphere in world space.
-    // sphereRadius(4) + spriteHalfHeight(2) + gap(1) = 7 world units upward.
-    // `position` is inherited from THREE.Object3D at runtime but SpriteText's
-    // bundled .d.ts does not re-export it — same narrow-cast pattern as `material`.
-    (sprite as unknown as { position: { y: number } }).position.y = 7;
+    // Shift the center anchor below the sprite so the text renders above the
+    // anchor (= node centre).  center.y = -1.5 puts the text bottom 6 wu above
+    // the node centre, clearing the 4 wu sphere radius with a 2 wu gap.
+    // THREE.Sprite.center is a Vector2 (x,y) defaulting to (0.5, 0.5).
+    // The key line in three/src/objects/Sprite.js:
+    //   _alignedPosition.subVectors(vertexPosition, center).addScalar(0.5).multiply(scale)
+    (sprite as unknown as { center: { set: (x: number, y: number) => void } }).center.set(0.5, -1.5);
     // Prevent z-fighting with sphere surfaces. `material` is inherited from
     // THREE.Sprite at runtime, but three@0.184 ships no bundled .d.ts and
     // @types/three is not installed, so the base class is typeless to tsc —
@@ -221,7 +231,11 @@ export default function ConstellationView({
         width={dims.width || undefined}
         height={dims.height || undefined}
         nodeId="id"
-        nodeLabel="name"
+        // nodeLabel drives the hover tooltip. The label is already always-visible
+        // via nodeThreeObject (SpriteText), so duplicating it in the tooltip is
+        // noise. Show the node's note when present; empty string suppresses the
+        // tooltip entirely when there is nothing extra to say.
+        nodeLabel={(node: { note?: string }) => node.note ?? ""}
         nodeColor={nodeColor}
         nodeOpacity={nodeOpacity}
         nodeThreeObject={nodeThreeObject}
