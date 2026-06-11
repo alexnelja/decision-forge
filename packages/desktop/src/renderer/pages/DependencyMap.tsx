@@ -69,9 +69,13 @@ export default function DependencyMap() {
   // Pending MC push: set to a nodeId when handlePushToMC is called.
   // A useEffect watches this flag and does the async persist → register → navigate.
   const [pendingMcPush, setPendingMcPush] = useState<string | null>(null);
-  // Stash the {nodeId, varName} computed inside the setMap updater so the effect
-  // can read it without closure staleness.
+  // {nodeId, varName} for the in-flight push. Doubles as the re-entrancy guard:
+  // non-null = a push is in flight, further pushes are ignored until it clears.
   const pendingMcRef = useRef<{ nodeId: string; varName: string } | null>(null);
+  // Live mirror of `map` so useCallback([]) handlers can read fresh state
+  // synchronously (assigned every render — never stale at event time).
+  const mapRef = useRef(map);
+  mapRef.current = map;
   // Freshly created node ids (born via double-click-add or drag-to-empty) that
   // have never been successfully named. Cancel-by-empty (committing an empty
   // label) deletes ONLY these — an existing node committed empty keeps its
@@ -422,60 +426,66 @@ export default function DependencyMap() {
   /**
    * Push an uncertainty node to § I Monte Carlo.
    *
-   * Phase 1 (sync): seeds node.mc inside a functional setMap updater — safe
-   * against stale closure; stashes {nodeId, varName} in a ref; sets
-   * pendingMcPush to trigger the effect.
+   * Phase 1 (sync): checks eligibility against fresh state (mapRef), computes
+   * the varName OUTSIDE the updater (the updater stays pure: seed-if-absent
+   * only), stashes {nodeId, varName} in a ref, sets pendingMcPush.
    * Phase 2 (async effect): persists, registers in mc-link-store, navigates.
+   *
+   * Re-entrancy: pendingMcRef doubles as an in-flight latch — a push while a
+   * previous push's save is still pending is ignored (no second concurrent
+   * save with a divergent payload, no dangling mc-link registration).
    */
   const handlePushToMC = useCallback((id: string) => {
-    setMap((prev) => {
-      const node = prev.nodes.find((n) => n.id === id);
-      if (!node || node.role !== "uncertainty") return prev;
+    if (pendingMcRef.current) return; // a push is already in flight — ignore
+    const node = mapRef.current.nodes.find((n) => n.id === id);
+    if (!node || node.role !== "uncertainty") return;
 
-      let resolvedVarName: string;
-      if (node.mc) {
-        // Already linked — preserve the definition, just queue re-register + navigate.
-        resolvedVarName = node.mc.varName;
-        pendingMcRef.current = { nodeId: id, varName: resolvedVarName };
-        return prev;
-      }
-
-      // Not yet linked — compute varName, seed mc block.
+    let varName: string;
+    if (node.mc) {
+      // Already linked — preserve the definition, just re-register + navigate.
+      varName = node.mc.varName;
+    } else {
       const taken = new Set(
-        prev.nodes.flatMap((n) => (n.mc ? [n.mc.varName] : []))
+        mapRef.current.nodes.flatMap((n) => (n.mc ? [n.mc.varName] : []))
       );
-      resolvedVarName = mcVarName(node.label, taken);
-      pendingMcRef.current = { nodeId: id, varName: resolvedVarName };
-
-      return {
+      varName = mcVarName(node.label, taken);
+      setMap((prev) => ({
         ...prev,
         nodes: prev.nodes.map((n) =>
-          n.id === id
+          n.id === id && !n.mc
             ? {
                 ...n,
                 mc: {
-                  varName: resolvedVarName,
+                  varName,
                   distribution: { kind: "triangular" as const, min: 0, mode: 0, max: 0 },
                 },
               }
             : n
         ),
         updatedAt: new Date().toISOString(),
-      };
-    });
+      }));
+    }
+
+    pendingMcRef.current = { nodeId: id, varName };
     setPendingMcPush(id);
   }, []);
 
   // Phase 2: async persist → register → navigate, triggered by pendingMcPush.
+  // The effect sees the post-update `map` (render between phases) — that's the
+  // point of the two-phase shape.
   useEffect(() => {
     if (!pendingMcPush || !pendingMcRef.current) return;
     const { nodeId, varName } = pendingMcRef.current;
+    let cancelled = false;
     (async () => {
       try {
         const updated = { ...map, updatedAt: new Date().toISOString() };
-        await mapsApi.save(updated);
-        addMcLink({ mapId: map.id, nodeId, varName });
-        navigate("/mc");
+        await mapsApi.save(updated); // persist FIRST
+        setMap(updated); // sync the saved stamp back into state (handleSave parity)
+        // mc-link-store is module-level and the save succeeded — register even
+        // if this component instance unmounted mid-save.
+        addMcLink({ mapId: updated.id, nodeId, varName });
+        if (!cancelled) navigate("/mc");
       } catch (err) {
         console.error("handlePushToMC: failed to save or register:", err);
       } finally {
@@ -483,6 +493,9 @@ export default function DependencyMap() {
         setPendingMcPush(null);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingMcPush]);
 

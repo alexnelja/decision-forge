@@ -375,6 +375,25 @@ describe("B3 – ReadoutPanel: Resolve-next rows show → Simulate affordance", 
       screen.queryByRole("button", { name: /simulate my lever in monte carlo/i })
     ).not.toBeInTheDocument();
   });
+
+  it("simulate affordance carries the focus-ring class like its sibling row button", () => {
+    const map = makeMapWithUncertainty();
+    const readout = decisionReadout(map);
+
+    render(
+      <ReadoutPanel
+        map={map}
+        readout={readout}
+        onSelect={vi.fn()}
+        onPushToMC={vi.fn()}
+      />
+    );
+
+    const btn = screen.getByRole("button", {
+      name: /simulate market demand in monte carlo/i,
+    });
+    expect(btn.className).toContain("focus-ring");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -577,5 +596,112 @@ describe("B5 – Role change away from uncertainty removes mc key", () => {
       const node = saved.nodes.find((n: DependencyNode) => n.label === "Supply");
       expect("mc" in node!).toBe(false);
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B6 – Re-entrancy guard: a second push while a save is in flight is ignored
+// ---------------------------------------------------------------------------
+describe("B6 – Re-entrancy: second push during in-flight save is ignored", () => {
+  /** Add a node via CapturePanel, select it, set role to uncertainty. */
+  async function addUncertaintyNode(label: string) {
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: label } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: label })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const uncRadio = await screen.findByRole("radio", { name: /uncertainty/i });
+    fireEvent.click(uncRadio);
+  }
+
+  it("only one save in flight; second push deferred until the first completes", async () => {
+    // Deferred save: resolve manually so we control in-flight timing.
+    const pendingResolves: Array<() => void> = [];
+    const saveMock = vi.fn().mockImplementation(
+      () => new Promise<void>((res) => { pendingResolves.push(res); })
+    );
+    (window as any).api.maps.save = saveMock;
+
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    await addUncertaintyNode("Alpha risk");
+    await addUncertaintyNode("Beta risk");
+
+    // Push Beta (currently selected) — save #1 starts and stays in flight.
+    fireEvent.click(await screen.findByRole("button", { name: /simulate in § i/i }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+
+    // Select Alpha and push while Beta's save is still in flight — must be IGNORED.
+    fireEvent.click(screen.getByRole("button", { name: "Alpha risk" }));
+    fireEvent.click(await screen.findByRole("button", { name: /simulate in § i/i }));
+
+    // Still exactly one save; no link registered, no navigation yet.
+    expect(saveMock).toHaveBeenCalledTimes(1);
+    expect(getMcLinks()).toHaveLength(0);
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    // Resolve save #1 → Beta's push completes (link + navigate).
+    pendingResolves[0]!();
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/mc"));
+    expect(getMcLinks().map((l) => l.varName)).toEqual(["beta_risk"]);
+    expect(saveMock).toHaveBeenCalledTimes(1);
+
+    // Now Alpha's push can proceed (Alpha still selected).
+    fireEvent.click(await screen.findByRole("button", { name: /simulate in § i/i }));
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    pendingResolves[1]!();
+    await waitFor(() => expect(getMcLinks()).toHaveLength(2));
+    expect(getMcLinks().map((l) => l.varName).sort()).toEqual(["alpha_risk", "beta_risk"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B7 – Failure contract: save rejection → no link, no navigate, console.error;
+//      a retry push after the failure succeeds.
+// ---------------------------------------------------------------------------
+describe("B7 – Failure contract: save rejection", () => {
+  it("rejected save → no addMcLink, no navigate, console.error; retry succeeds", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const saveMock = vi.fn()
+      .mockRejectedValueOnce(new Error("disk full"))
+      .mockResolvedValue(undefined);
+    (window as any).api.maps.save = saveMock;
+
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "Flaky risk" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBeGreaterThanOrEqual(1);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Flaky risk" }));
+    const uncRadio = await screen.findByRole("radio", { name: /uncertainty/i });
+    fireEvent.click(uncRadio);
+
+    // First push — save rejects.
+    fireEvent.click(await screen.findByRole("button", { name: /simulate in § i/i }));
+    await waitFor(() => expect(errSpy).toHaveBeenCalled());
+
+    // Failure contract: nothing registered, no navigation.
+    expect(getMcLinks()).toHaveLength(0);
+    expect(mockNavigate).not.toHaveBeenCalled();
+
+    // Retry — save resolves this time; existing mc definition is reused.
+    fireEvent.click(await screen.findByRole("button", { name: /simulate in § i/i }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/mc"));
+    expect(getMcLinks().map((l) => l.varName)).toEqual(["flaky_risk"]);
+
+    errSpy.mockRestore();
   });
 });

@@ -302,7 +302,8 @@ function RowButton({
       {onPushToMC && (
         <button
           aria-label={simulateAriaLabel}
-          onClick={(e) => { e.stopPropagation(); onPushToMC(); }}
+          onClick={onPushToMC}
+          className="focus-ring"
           title="Simulate in Monte Carlo (§ I)"
           style={{
             flexShrink: 0,
