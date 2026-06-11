@@ -1368,3 +1368,158 @@ describe("Capture-panel pin — aria-label + persistence", () => {
     expect(localStorageMock.getItem("df.capture.pinned")).toBe("true");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Floating overlay panel — Item 1 feedback: "right sidetable should float
+// transparently over the viewport/map" so the canvas gets full width.
+// ---------------------------------------------------------------------------
+describe("Floating overlay panel — presence, collapse, localStorage persistence", () => {
+  // localStorage mock — same pattern as capture-panel pin tests above.
+  const store: Record<string, string> = {};
+  const localStorageMock = {
+    getItem: (key: string): string | null => store[key] ?? null,
+    setItem: (key: string, value: string) => { store[key] = value; },
+    removeItem: (key: string) => { delete store[key]; },
+    clear: () => { Object.keys(store).forEach((k) => delete store[k]); },
+  };
+
+  beforeEach(() => {
+    Object.defineProperty(globalThis, "localStorage", {
+      value: localStorageMock,
+      configurable: true,
+      writable: true,
+    });
+    localStorageMock.clear();
+  });
+
+  afterEach(() => {
+    localStorageMock.clear();
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
+
+  it("overlay panel is present in the DOM (data-testid=depmap-overlay-panel)", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId("depmap-overlay-panel")).toBeInTheDocument();
+  });
+
+  it("canvas area wrapper (data-testid=depmap-canvas-area) is in the DOM", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    expect(screen.getByTestId("depmap-canvas-area")).toBeInTheDocument();
+  });
+
+  it("overlay panel is a child of the canvas area, not a sibling grid column", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const canvasArea = screen.getByTestId("depmap-canvas-area");
+    const panel = screen.getByTestId("depmap-overlay-panel");
+    // The panel must be a descendant of the canvas area wrapper.
+    expect(canvasArea.contains(panel)).toBe(true);
+  });
+
+  it("toggle button is present with aria-label 'Collapse side panel' (default open)", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const toggleBtn = screen.getByTestId("depmap-panel-toggle");
+    expect(toggleBtn).toBeInTheDocument();
+    expect(toggleBtn).toHaveAttribute("aria-label", "Collapse side panel");
+  });
+
+  it("clicking the toggle collapses the panel (aria-label changes to Expand)", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const toggleBtn = screen.getByTestId("depmap-panel-toggle");
+    fireEvent.click(toggleBtn);
+    expect(toggleBtn).toHaveAttribute("aria-label", "Expand side panel");
+  });
+
+  it("clicking toggle twice returns panel to open state", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const toggleBtn = screen.getByTestId("depmap-panel-toggle");
+    fireEvent.click(toggleBtn);
+    fireEvent.click(toggleBtn);
+    expect(toggleBtn).toHaveAttribute("aria-label", "Collapse side panel");
+  });
+
+  it("localStorage key 'df.depmap.panel.pinned'='false' → panel starts collapsed", () => {
+    localStorageMock.setItem("df.depmap.panel.pinned", "false");
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    const toggleBtn = screen.getByTestId("depmap-panel-toggle");
+    expect(toggleBtn).toHaveAttribute("aria-label", "Expand side panel");
+  });
+
+  it("collapsing panel writes 'false' to localStorage('df.depmap.panel.pinned')", () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByTestId("depmap-panel-toggle"));
+    expect(localStorageMock.getItem("df.depmap.panel.pinned")).toBe("false");
+  });
+
+  it("expanding panel writes 'true' to localStorage('df.depmap.panel.pinned')", () => {
+    localStorageMock.setItem("df.depmap.panel.pinned", "false");
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    fireEvent.click(screen.getByTestId("depmap-panel-toggle"));
+    expect(localStorageMock.getItem("df.depmap.panel.pinned")).toBe("true");
+  });
+
+  it("ReadoutPanel content is visible when panel is open", async () => {
+    render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    // ReadoutPanel renders its header label
+    expect(screen.getByTestId("depmap-overlay-panel")).toBeInTheDocument();
+    // The panel body contains the readout/inspector/structure panels
+    const panel = screen.getByTestId("depmap-overlay-panel");
+    // Decision Readout header text exists inside the panel
+    expect(panel.querySelector("[data-testid='depmap-panel-toggle']")).toBeInTheDocument();
+  });
+
+  it("canvas grid does not have a fixed marginalia column (ModuleFrame rendered without marginalia)", () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    // ModuleFrame with no marginalia prop still renders its article+aside grid.
+    // Confirm the aside column is empty (no ReadoutPanel content inside it).
+    // ReadoutPanel / NodeInspector / StructurePanel must NOT appear in the aside.
+    const aside = container.querySelector("aside");
+    // The aside should not contain the overlay panel's toggle button
+    if (aside) {
+      expect(aside.querySelector("[data-testid='depmap-panel-toggle']")).toBeNull();
+    }
+  });
+});

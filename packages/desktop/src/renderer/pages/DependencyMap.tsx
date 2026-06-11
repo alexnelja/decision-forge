@@ -10,6 +10,20 @@ import type { NodeRole } from "./depmap/roles";
 import { useAnalysis } from "./depmap/useAnalysis";
 import { mapsApi } from "../lib/maps-api";
 
+/**
+ * Read the right-panel pinned preference from localStorage.
+ * Key: "df.depmap.panel.pinned". Defaults to true (open).
+ */
+function readPanelPinned(): boolean {
+  try {
+    const stored = localStorage.getItem("df.depmap.panel.pinned");
+    if (stored === null) return true;
+    return stored !== "false";
+  } catch {
+    return true;
+  }
+}
+
 // Lazy-load ConstellationView so that three.js (600+ kB) is code-split into its
 // own chunk and NOT bundled into the main renderer entry.  It is only fetched
 // when the user first clicks the [3D] toggle.
@@ -66,6 +80,24 @@ export default function DependencyMap() {
       const next = !p;
       try {
         localStorage.setItem("df.capture.pinned", String(next));
+      } catch {
+        // localStorage may be unavailable in some contexts — ignore
+      }
+      return next;
+    });
+  }, []);
+
+  // Collapsible right overlay panel (Decision Readout / NodeInspector / StructurePanel).
+  // Floats over the canvas — pinned open by default. Persists to
+  // localStorage("df.depmap.panel.pinned"). The pin/rail convention matches the
+  // capture panel above: ●/○ glyph, same button style.
+  const [panelPinned, setPanelPinned] = useState<boolean>(() => readPanelPinned());
+
+  const togglePanelPinned = useCallback(() => {
+    setPanelPinned((p) => {
+      const next = !p;
+      try {
+        localStorage.setItem("df.depmap.panel.pinned", String(next));
       } catch {
         // localStorage may be unavailable in some contexts — ignore
       }
@@ -435,22 +467,6 @@ export default function DependencyMap() {
       title="Dependency Map"
       accent="var(--sec-depmap)"
       lede="Map the factors of a decision and the lines of force between them. Read the structure back: what drives what, where the loops are, what a change ripples into."
-      marginalia={
-        <>
-          <ReadoutPanel
-            map={map}
-            readout={analysis.readout}
-            onSelect={setSelectedId}
-          />
-          <NodeInspector
-            node={selectedNode}
-            onUpdate={handleUpdateNode}
-            onDelete={handleDeleteNode}
-            onClose={() => setSelectedId(null)}
-          />
-          <StructurePanel map={map} selectedId={selectedId} />
-        </>
-      }
     >
       {/* ── Header bar: map name + persistence controls + view toggle ── */}
       <div
@@ -692,8 +708,8 @@ export default function DependencyMap() {
           )}
         </div>
 
-        {/* Right: layered DAG canvas OR 3D constellation */}
-        <div style={{ position: "relative", height: "100%" }}>
+        {/* Right: layered DAG canvas OR 3D constellation, with floating overlay panel */}
+        <div style={{ position: "relative", height: "100%" }} data-testid="depmap-canvas-area">
           {viewMode === "layered" ? (
             <LayeredView
               map={map}
@@ -749,6 +765,85 @@ export default function DependencyMap() {
             }}
           >
             Drag from a driver → to what it depends on / affects.
+          </div>
+
+          {/* ── Floating right overlay panel ────────────────────────────────
+           *  Sits at top:40px so the Tidy button (absolute top:8, right:8 inside
+           *  LayeredView) is never covered — the ~32px gap keeps both visible.
+           *  z-index 20: above the canvas (0) and loop badges (8) / empty-state (5)
+           *  / Tidy (10), but below context menus (portalled to body, typically
+           *  z:50+) and the open-map dialog (z:50).
+           *  backdrop-filter blur gives the frosted-glass effect requested.
+           *  Collapsed: only the toggle rail (24px) is shown; panel body is hidden.
+           ────────────────────────────────────────────────────────────────── */}
+          <div
+            data-testid="depmap-overlay-panel"
+            style={{
+              position: "absolute",
+              top: "40px",
+              right: "0",
+              zIndex: 20,
+              width: panelPinned ? "310px" : "24px",
+              maxHeight: "calc(100% - 48px)",
+              display: "flex",
+              flexDirection: "column",
+              transition: "width 0.22s ease",
+              overflow: "hidden",
+            }}
+          >
+            {/* Toggle tab — always visible on the left edge of the panel */}
+            <button
+              onClick={togglePanelPinned}
+              title={panelPinned ? "Collapse side panel" : "Expand side panel"}
+              aria-label={panelPinned ? "Collapse side panel" : "Expand side panel"}
+              data-testid="depmap-panel-toggle"
+              style={{
+                alignSelf: "flex-start",
+                background: panelPinned ? "var(--sec-depmap)" : "var(--paper-raised)",
+                border: "1px solid var(--paper-rule)",
+                borderRadius: "3px",
+                color: panelPinned ? "#fff" : "var(--ink-dim)",
+                fontSize: "9px",
+                padding: "8px",
+                cursor: "pointer",
+                lineHeight: 1,
+                marginBottom: "4px",
+                transition: "background 0.15s, color 0.15s",
+                flexShrink: 0,
+              }}
+            >
+              {panelPinned ? "●" : "○"}
+            </button>
+
+            {/* Panel body — only shown when pinned open */}
+            {panelPinned && (
+              <div
+                style={{
+                  flex: 1,
+                  overflowY: "auto",
+                  background: "rgba(var(--paper-raised-rgb, 30, 28, 24), 0.88)",
+                  backdropFilter: "blur(6px)",
+                  WebkitBackdropFilter: "blur(6px)",
+                  borderLeft: "1px solid var(--paper-rule)",
+                  borderRadius: "0 0 0 6px",
+                  boxShadow: "-4px 4px 20px rgba(0,0,0,0.35)",
+                  padding: "12px 14px",
+                }}
+              >
+                <ReadoutPanel
+                  map={map}
+                  readout={analysis.readout}
+                  onSelect={setSelectedId}
+                />
+                <NodeInspector
+                  node={selectedNode}
+                  onUpdate={handleUpdateNode}
+                  onDelete={handleDeleteNode}
+                  onClose={() => setSelectedId(null)}
+                />
+                <StructurePanel map={map} selectedId={selectedId} />
+              </div>
+            )}
           </div>
         </div>
       </div>
