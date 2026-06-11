@@ -913,7 +913,7 @@ function LayeredViewInner({
         panOnScroll={true}
       >
         <Background color="var(--paper-rule)" gap={24} size={1} />
-        <Controls showInteractive={false} />
+        <Controls showInteractive={false} fitViewOptions={{ padding: FITVIEW_PADDING }} />
       </ReactFlow>
 
       {/* Edge toolbar — appears when an edge is selected */}
