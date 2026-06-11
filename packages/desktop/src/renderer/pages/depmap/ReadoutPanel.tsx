@@ -19,6 +19,8 @@ export interface ReadoutPanelProps {
   map: DependencyMap;
   readout: Readout;
   onSelect: (nodeId: string) => void;
+  /** Optional: called when the user clicks "→ Simulate" on a Resolve-next row. */
+  onPushToMC?: (nodeId: string) => void;
 }
 
 // Glyphs for the panel sections and loop types.
@@ -40,7 +42,7 @@ function nodeLabel(map: DependencyMap, nodeId: string): string {
   return map.nodes.find((n) => n.id === nodeId)?.label ?? nodeId;
 }
 
-export function ReadoutPanel({ map, readout, onSelect }: ReadoutPanelProps) {
+export function ReadoutPanel({ map, readout, onSelect, onPushToMC }: ReadoutPanelProps) {
   const { actFirst, resolveNext, planAround, guidance } = readout;
   const hasActFirst    = actFirst.length > 0;
   const hasResolveNext = resolveNext.length > 0;
@@ -147,6 +149,8 @@ export function ReadoutPanel({ map, readout, onSelect }: ReadoutPanelProps) {
                 label={label}
                 reason={entry.reason}
                 onClick={() => onSelect(entry.nodeId)}
+                onPushToMC={onPushToMC ? () => onPushToMC(entry.nodeId) : undefined}
+                simulateAriaLabel={`Simulate ${label} in Monte Carlo`}
               />
             );
           })}
@@ -244,6 +248,8 @@ function RowButton({
   reason,
   ariaLabel,
   onClick,
+  onPushToMC,
+  simulateAriaLabel,
 }: {
   label: string;
   reason?: string;
@@ -254,40 +260,66 @@ function RowButton({
    */
   ariaLabel?: string;
   onClick: () => void;
+  /** Present on Resolve-next rows: fires the MC push for this entry. */
+  onPushToMC?: () => void;
+  simulateAriaLabel?: string;
 }) {
   return (
-    <button
-      aria-label={ariaLabel}
-      onClick={onClick}
-      className="readout-row focus-ring"
-      style={{
-        display: "block",
-        width: "100%",
-        textAlign: "left",
-        background: "none",
-        border: "none",
-        cursor: "pointer",
-        padding: "4px 6px",
-        borderRadius: "3px",
-        fontFamily: "var(--font-display, inherit)",
-        color: "var(--ink)",
-        fontSize: "12px",
-        lineHeight: 1.4,
-      }}
-    >
-      <span style={{ fontWeight: 500 }}>{label}</span>
-      {reason && (
-        <span
+    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+      <button
+        aria-label={ariaLabel}
+        onClick={onClick}
+        className="readout-row focus-ring"
+        style={{
+          display: "block",
+          flex: 1,
+          textAlign: "left",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          padding: "4px 6px",
+          borderRadius: "3px",
+          fontFamily: "var(--font-display, inherit)",
+          color: "var(--ink)",
+          fontSize: "12px",
+          lineHeight: 1.4,
+        }}
+      >
+        <span style={{ fontWeight: 500 }}>{label}</span>
+        {reason && (
+          <span
+            style={{
+              display: "block",
+              fontSize: "10px",
+              color: "var(--ink-dim)",
+              marginTop: "1px",
+            }}
+          >
+            {reason}
+          </span>
+        )}
+      </button>
+      {onPushToMC && (
+        <button
+          aria-label={simulateAriaLabel}
+          onClick={(e) => { e.stopPropagation(); onPushToMC(); }}
+          title="Simulate in Monte Carlo (§ I)"
           style={{
-            display: "block",
+            flexShrink: 0,
+            background: "none",
+            border: "1px solid var(--sec-mc, #6bbf8e)",
+            borderRadius: "3px",
+            color: "var(--sec-mc, #6bbf8e)",
             fontSize: "10px",
-            color: "var(--ink-dim)",
-            marginTop: "1px",
+            padding: "2px 5px",
+            cursor: "pointer",
+            fontFamily: "var(--font-display, inherit)",
+            whiteSpace: "nowrap",
           }}
         >
-          {reason}
-        </span>
+          → §I
+        </button>
       )}
-    </button>
+    </div>
   );
 }

@@ -80,6 +80,7 @@ export interface LayeredViewProps {
   onCancelRename: (id: string) => void;
   onStartRename: (id: string) => void;
   onSetRole: (id: string, role: "objective" | "lever" | "uncertainty" | "factor") => void;
+  onPushToMC?: (id: string) => void;
   // Task 6 edge mutation props
   onFlipEdge: (id: string) => void;
   onCycleEdgeSign: (id: string) => void;
@@ -151,6 +152,7 @@ function LayeredViewInner({
   onCancelRename,
   onStartRename,
   onSetRole,
+  onPushToMC,
   onFlipEdge,
   onCycleEdgeSign,
   onToggleEdgeConfidence,
@@ -566,6 +568,7 @@ function LayeredViewInner({
         x: evt.clientX,
         y: evt.clientY,
         nodeId: node.id,
+        role: node.data.role,
         onRename: (id) => {
           onSelect(id);
           onStartRename(id);
@@ -573,10 +576,11 @@ function LayeredViewInner({
         onDuplicate: duplicateNode,
         onSetRole: onSetRole,
         onDelete: onDeleteNode,
+        onPushToMC: onPushToMC,
         onClose: closeContextMenu,
       });
     },
-    [onSelect, onStartRename, duplicateNode, onSetRole, onDeleteNode, closeContextMenu]
+    [onSelect, onStartRename, duplicateNode, onSetRole, onPushToMC, onDeleteNode, closeContextMenu]
   );
 
   // Pane context menu — wired on the wrapper div rather than onPaneContextMenu

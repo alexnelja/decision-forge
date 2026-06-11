@@ -14,9 +14,11 @@ interface NodeInspectorProps {
   onUpdate: (id: string, patch: { label?: string; note?: string; role?: NodeRole }) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  /** Optional: called when the user clicks "→ Simulate in § I" (uncertainty nodes only). */
+  onPushToMC?: (id: string) => void;
 }
 
-export function NodeInspector({ node, onUpdate, onDelete, onClose }: NodeInspectorProps) {
+export function NodeInspector({ node, onUpdate, onDelete, onClose, onPushToMC }: NodeInspectorProps) {
   // Local draft state so edits don't fire on every keystroke — commit on blur.
   const [labelDraft, setLabelDraft] = useState(node?.label ?? "");
   const [noteDraft, setNoteDraft] = useState(node?.note ?? "");
@@ -262,6 +264,29 @@ export function NodeInspector({ node, onUpdate, onDelete, onClose }: NodeInspect
       >
         Stores: id · label · note · role · position
       </p>
+
+      {/* → Simulate in § I — shown only for uncertainty nodes */}
+      {node.role === "uncertainty" && onPushToMC && (
+        <button
+          aria-label="→ Simulate in § I"
+          onClick={() => onPushToMC(node.id)}
+          style={{
+            width: "100%",
+            background: "none",
+            border: "1px solid var(--sec-mc, #6bbf8e)",
+            borderRadius: "3px",
+            color: "var(--sec-mc, #6bbf8e)",
+            fontSize: "11px",
+            padding: "5px 8px",
+            cursor: "pointer",
+            fontFamily: "var(--font-display, inherit)",
+            letterSpacing: "0.04em",
+            marginBottom: "6px",
+          }}
+        >
+          → Simulate in § I
+        </button>
+      )}
 
       {/* Delete button */}
       <button

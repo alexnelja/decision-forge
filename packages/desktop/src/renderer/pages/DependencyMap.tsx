@@ -1,6 +1,8 @@
-import { useState, useRef, useCallback, lazy, Suspense } from "react";
+import { useState, useRef, useCallback, useEffect, lazy, Suspense } from "react";
+import { useNavigate } from "react-router-dom";
 import { ModuleFrame } from "../components/ModuleFrame";
 import type { DependencyMap as DMap, DependencyEdge, DependencyNode } from "@decision-forge/core";
+import { mcVarName } from "@decision-forge/core";
 import { CapturePanel } from "./depmap/CapturePanel";
 import { LayeredView } from "./depmap/LayeredView";
 import { StructurePanel } from "./depmap/StructurePanel";
@@ -9,6 +11,7 @@ import { ReadoutPanel } from "./depmap/ReadoutPanel";
 import type { NodeRole } from "./depmap/roles";
 import { useAnalysis } from "./depmap/useAnalysis";
 import { mapsApi } from "../lib/maps-api";
+import { addMcLink } from "../lib/mc-link-store";
 
 /**
  * Read the right-panel pinned preference from localStorage.
@@ -59,9 +62,16 @@ function readCapturePinned(): boolean {
 }
 
 export default function DependencyMap() {
+  const navigate = useNavigate();
   const [map, setMap] = useState<DMap>(makeEmpty);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
+  // Pending MC push: set to a nodeId when handlePushToMC is called.
+  // A useEffect watches this flag and does the async persist → register → navigate.
+  const [pendingMcPush, setPendingMcPush] = useState<string | null>(null);
+  // Stash the {nodeId, varName} computed inside the setMap updater so the effect
+  // can read it without closure staleness.
+  const pendingMcRef = useRef<{ nodeId: string; varName: string } | null>(null);
   // Freshly created node ids (born via double-click-add or drag-to-empty) that
   // have never been successfully named. Cancel-by-empty (committing an empty
   // label) deletes ONLY these — an existing node committed empty keeps its
@@ -387,8 +397,13 @@ export default function DependencyMap() {
         // "role":"factor"), mirroring sign/confidence key removal on edges.
         if (patch.role === "factor") {
           const { role: _patchRole, ...patchRest } = patch;
-          const { role: _nodeRole, ...nodeRest } = n;
+          const { role: _nodeRole, mc: _mc, ...nodeRest } = n;
           return { ...nodeRest, ...patchRest };
+        }
+        // Role change away from uncertainty strips the mc block (key removal).
+        if (patch.role !== undefined && patch.role !== "uncertainty" && n.mc) {
+          const { mc: _mc, ...nodeWithoutMc } = n;
+          return { ...nodeWithoutMc, ...patch };
         }
         return { ...n, ...patch };
       }),
@@ -403,6 +418,73 @@ export default function DependencyMap() {
   const handleSetRole = useCallback((id: string, role: NodeRole) => {
     handleUpdateNode(id, { role });
   }, [handleUpdateNode]);
+
+  /**
+   * Push an uncertainty node to § I Monte Carlo.
+   *
+   * Phase 1 (sync): seeds node.mc inside a functional setMap updater — safe
+   * against stale closure; stashes {nodeId, varName} in a ref; sets
+   * pendingMcPush to trigger the effect.
+   * Phase 2 (async effect): persists, registers in mc-link-store, navigates.
+   */
+  const handlePushToMC = useCallback((id: string) => {
+    setMap((prev) => {
+      const node = prev.nodes.find((n) => n.id === id);
+      if (!node || node.role !== "uncertainty") return prev;
+
+      let resolvedVarName: string;
+      if (node.mc) {
+        // Already linked — preserve the definition, just queue re-register + navigate.
+        resolvedVarName = node.mc.varName;
+        pendingMcRef.current = { nodeId: id, varName: resolvedVarName };
+        return prev;
+      }
+
+      // Not yet linked — compute varName, seed mc block.
+      const taken = new Set(
+        prev.nodes.flatMap((n) => (n.mc ? [n.mc.varName] : []))
+      );
+      resolvedVarName = mcVarName(node.label, taken);
+      pendingMcRef.current = { nodeId: id, varName: resolvedVarName };
+
+      return {
+        ...prev,
+        nodes: prev.nodes.map((n) =>
+          n.id === id
+            ? {
+                ...n,
+                mc: {
+                  varName: resolvedVarName,
+                  distribution: { kind: "triangular" as const, min: 0, mode: 0, max: 0 },
+                },
+              }
+            : n
+        ),
+        updatedAt: new Date().toISOString(),
+      };
+    });
+    setPendingMcPush(id);
+  }, []);
+
+  // Phase 2: async persist → register → navigate, triggered by pendingMcPush.
+  useEffect(() => {
+    if (!pendingMcPush || !pendingMcRef.current) return;
+    const { nodeId, varName } = pendingMcRef.current;
+    (async () => {
+      try {
+        const updated = { ...map, updatedAt: new Date().toISOString() };
+        await mapsApi.save(updated);
+        addMcLink({ mapId: map.id, nodeId, varName });
+        navigate("/mc");
+      } catch (err) {
+        console.error("handlePushToMC: failed to save or register:", err);
+      } finally {
+        pendingMcRef.current = null;
+        setPendingMcPush(null);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingMcPush]);
 
   const handleRelayout = useCallback((positions: Map<string, { x: number; y: number }>) => {
     setMap((prev) => ({
@@ -730,6 +812,7 @@ export default function DependencyMap() {
               onCancelRename={handleCancelRename}
               onStartRename={handleStartRename}
               onSetRole={handleSetRole}
+              onPushToMC={handlePushToMC}
               onFlipEdge={handleFlipEdge}
               onCycleEdgeSign={handleCycleEdgeSign}
               onToggleEdgeConfidence={handleToggleEdgeConfidence}
@@ -859,12 +942,14 @@ export default function DependencyMap() {
                     map={map}
                     readout={analysis.readout}
                     onSelect={setSelectedId}
+                    onPushToMC={handlePushToMC}
                   />
                   <NodeInspector
                     node={selectedNode}
                     onUpdate={handleUpdateNode}
                     onDelete={handleDeleteNode}
                     onClose={() => setSelectedId(null)}
+                    onPushToMC={handlePushToMC}
                   />
                   <StructurePanel map={map} selectedId={selectedId} />
                 </div>
