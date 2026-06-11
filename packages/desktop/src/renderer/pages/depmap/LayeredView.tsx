@@ -27,6 +27,8 @@ import { FactorNode, type FactorNodeData } from "./FactorNode";
 import { ContextMenu, type ContextMenuProps } from "./ContextMenu";
 import { EdgeToolbar } from "./EdgeToolbar";
 import { edgeVisual } from "./edge-style";
+import { FloatingEdge } from "./FloatingEdge";
+import { FloatingConnectionLine } from "./FloatingConnectionLine";
 
 // ---------------------------------------------------------------------------
 // Module-level nodeTypes constant — react-flow warns if this is defined inline
@@ -34,12 +36,22 @@ import { edgeVisual } from "./edge-style";
 
 const nodeTypes = { factor: FactorNode };
 
+// Module-level edgeTypes constant — floating edges for correct border routing
+const edgeTypes = { floating: FloatingEdge };
+
 /**
  * Delay before the deferred fitView fires after a topology change — lets
  * react-flow finish painting before measuring. Exported so tests can settle
  * past it deterministically instead of using a magic number.
  */
 export const FITVIEW_DELAY_MS = 50;
+
+/**
+ * Padding fraction used for all fitView calls (Controls + scheduleFitView).
+ * 0.25 gives edges and node badges breathing room without cropping arrowheads.
+ * Exported so tests can assert the value.
+ */
+export const FITVIEW_PADDING = 0.25;
 
 // ---------------------------------------------------------------------------
 // Types
@@ -182,7 +194,7 @@ function LayeredViewInner({
     if (fitTimerRef.current) clearTimeout(fitTimerRef.current);
     fitTimerRef.current = setTimeout(() => {
       fitTimerRef.current = null;
-      fitView({ padding: 0.2 });
+      fitView({ padding: FITVIEW_PADDING });
     }, FITVIEW_DELAY_MS);
   }, [fitView]);
 
@@ -263,6 +275,7 @@ function LayeredViewInner({
             id: e.id,
             source: e.from,
             target: e.to,
+            type: "floating" as const,
             // Store sign/confidence on the RF edge data so context menu can read it
             data: { sign: e.sign, confidence: e.confidence },
             markerEnd: {
@@ -385,6 +398,7 @@ function LayeredViewInner({
 
         return {
           ...e,
+          type: "floating" as const,
           data: { sign: mapEdge?.sign, confidence: mapEdge?.confidence },
           markerEnd: { type: MarkerType.ArrowClosed, color: visual.stroke },
           style: {
@@ -863,6 +877,8 @@ function LayeredViewInner({
         nodes={rfNodes}
         edges={rfEdges}
         nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        connectionLineComponent={FloatingConnectionLine}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={handleConnect}
@@ -884,7 +900,7 @@ function LayeredViewInner({
         onMove={handleMove}
         edgesUpdatable={true}
         fitView
-        fitViewOptions={{ padding: 0.2 }}
+        fitViewOptions={{ padding: FITVIEW_PADDING }}
         proOptions={{ hideAttribution: true }}
         style={{ background: "transparent" }}
         nodesDraggable={true}
