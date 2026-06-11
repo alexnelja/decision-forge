@@ -295,8 +295,10 @@ describe("B2 – Second click does not re-seed but still navigates", () => {
     const firstSaveCallCount = (window as any).api.maps.save.mock.calls.length;
     mockNavigate.mockReset();
 
-    // Second click — should navigate again, NOT change varName
-    fireEvent.click(simulateBtn);
+    // After first push the node has mc → inspector now shows "Edit in § I" instead.
+    // Second click via the new "Edit in § I" button — should navigate again, NOT change varName.
+    const editInBtn = await screen.findByRole("button", { name: /edit in § i/i });
+    fireEvent.click(editInBtn);
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith("/mc");
     });
@@ -697,11 +699,303 @@ describe("B7 – Failure contract: save rejection", () => {
     expect(getMcLinks()).toHaveLength(0);
     expect(mockNavigate).not.toHaveBeenCalled();
 
-    // Retry — save resolves this time; existing mc definition is reused.
-    fireEvent.click(await screen.findByRole("button", { name: /simulate in § i/i }));
+    // Retry — the node now has mc seeded (Phase 1 ran before save failed),
+    // so the inspector shows "Edit in § I". Save resolves this time.
+    fireEvent.click(await screen.findByRole("button", { name: /edit in § i/i }));
     await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/mc"));
     expect(getMcLinks().map((l) => l.varName)).toEqual(["flaky_risk"]);
 
     errSpy.mockRestore();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 5 — § IV display side
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// T5-B1 – FactorNode renders mc range chip via LayeredView data flags
+//   (tested indirectly via NodeInspector for the linked node state,
+//    and directly via the DependencyMap integration for the chip text)
+// ---------------------------------------------------------------------------
+
+// T5-B2 – NodeInspector shows distribution summary + Edit in § I + Unlink
+// ---------------------------------------------------------------------------
+describe("T5-B2 – NodeInspector: linked node shows distribution summary + actions", () => {
+  const linkedNode: DependencyNode = {
+    id: "linked-node-id",
+    label: "Market demand",
+    role: "uncertainty",
+    mc: {
+      varName: "market_demand",
+      distribution: { kind: "triangular", min: 10, mode: 25, max: 50 },
+      summary: { p10: 14, p50: 26, p90: 44, mean: 27.5, definedAt: "2026-06-11T00:00:00Z" },
+    },
+  };
+
+  const linkedUnconfigured: DependencyNode = {
+    id: "linked-node-id",
+    label: "Market demand",
+    role: "uncertainty",
+    mc: {
+      varName: "market_demand",
+      distribution: { kind: "triangular", min: 0, mode: 0, max: 0 },
+    },
+  };
+
+  it("shows distribution kind and parameters for a linked uncertainty node", () => {
+    render(
+      <NodeInspector
+        node={linkedNode}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={vi.fn()}
+      />
+    );
+    // Should show the distribution kind
+    expect(screen.getByText(/triangular/i)).toBeInTheDocument();
+    // Should show parameter values — look for the params string with min value
+    expect(screen.getByText(/min 10/i)).toBeInTheDocument();
+  });
+
+  it("shows the range p10·p50·p90 when summary exists", () => {
+    render(
+      <NodeInspector
+        node={linkedNode}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={vi.fn()}
+      />
+    );
+    // Range line: 14 · 26 · 44
+    expect(screen.getByText(/14/)).toBeInTheDocument();
+    expect(screen.getByText(/44/)).toBeInTheDocument();
+  });
+
+  it("shows 'Edit in § I' button for a linked uncertainty node", () => {
+    render(
+      <NodeInspector
+        node={linkedNode}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole("button", { name: /edit in § i/i })
+    ).toBeInTheDocument();
+  });
+
+  it("'Edit in § I' calls onPushToMC with the node id (re-register + navigate)", () => {
+    const onPushToMC = vi.fn();
+    render(
+      <NodeInspector
+        node={linkedNode}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={onPushToMC}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /edit in § i/i }));
+    expect(onPushToMC).toHaveBeenCalledWith("linked-node-id");
+  });
+
+  it("shows 'Unlink' button for a linked uncertainty node", () => {
+    render(
+      <NodeInspector
+        node={linkedNode}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={vi.fn()}
+        onUnlinkMC={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole("button", { name: /unlink/i })
+    ).toBeInTheDocument();
+  });
+
+  it("'Unlink' calls onUnlinkMC with the node id", () => {
+    const onUnlinkMC = vi.fn();
+    render(
+      <NodeInspector
+        node={linkedNode}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={vi.fn()}
+        onUnlinkMC={onUnlinkMC}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /unlink/i }));
+    expect(onUnlinkMC).toHaveBeenCalledWith("linked-node-id");
+  });
+
+  it("does NOT show 'Unlink' when onUnlinkMC prop is absent", () => {
+    render(
+      <NodeInspector
+        node={linkedNode}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={vi.fn()}
+        // no onUnlinkMC
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: /unlink/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows '→ § I' hint when linked but unconfigured (no summary)", () => {
+    render(
+      <NodeInspector
+        node={linkedUnconfigured}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={vi.fn()}
+      />
+    );
+    // Unconfigured: distribution is all-zeros → show hint to configure
+    expect(screen.getByText(/→ § i/i)).toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T5-B3 – ReadoutPanel Resolve-next rows append range suffix
+// ---------------------------------------------------------------------------
+describe("T5-B3 – ReadoutPanel: Resolve-next rows with mc.summary append range suffix", () => {
+  function makeMapWithLinkedUncertainty(): DMap {
+    return {
+      id: "test-map-range",
+      name: "Range test",
+      createdAt: "2026-06-11T00:00:00Z",
+      updatedAt: "2026-06-11T00:00:00Z",
+      nodes: [
+        { id: "obj-id-r", label: "Outcome", role: "objective" },
+        {
+          id: "unc-id-r",
+          label: "Market demand",
+          role: "uncertainty",
+          mc: {
+            varName: "market_demand",
+            distribution: { kind: "triangular", min: 10, mode: 25, max: 50 },
+            summary: { p10: 14, p50: 26, p90: 44, mean: 27.5, definedAt: "2026-06-11T00:00:00Z" },
+          },
+        },
+        { id: "lev-id-r", label: "My lever", role: "lever" },
+      ],
+      edges: [
+        { id: "e1", from: "unc-id-r", to: "obj-id-r" },
+        { id: "e2", from: "lev-id-r", to: "obj-id-r" },
+      ],
+    };
+  }
+
+  it("appends p10–p90 range suffix to Resolve-next row reason when summary exists", () => {
+    const map = makeMapWithLinkedUncertainty();
+    const readout = decisionReadout(map);
+
+    render(
+      <ReadoutPanel
+        map={map}
+        readout={readout}
+        onSelect={vi.fn()}
+        onPushToMC={vi.fn()}
+      />
+    );
+
+    // The range suffix "14–44" should appear in the resolve-next row
+    expect(screen.getByText(/14.{1,5}44/)).toBeInTheDocument();
+  });
+
+  it("does NOT append range suffix for Resolve-next rows without mc.summary", () => {
+    const map = makeMapWithLinkedUncertainty();
+    // Strip summary from the node
+    const mapNoSummary: DMap = {
+      ...map,
+      nodes: map.nodes.map((n) =>
+        n.id === "unc-id-r"
+          ? { ...n, mc: { varName: "market_demand", distribution: { kind: "triangular", min: 10, mode: 25, max: 50 } } }
+          : n
+      ),
+    };
+    const readout = decisionReadout(mapNoSummary);
+
+    render(
+      <ReadoutPanel
+        map={mapNoSummary}
+        readout={readout}
+        onSelect={vi.fn()}
+        onPushToMC={vi.fn()}
+      />
+    );
+
+    // No summary → no range suffix
+    expect(screen.queryByText(/14.{1,5}44/)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T5-B4 – handleUnlinkMC in DependencyMap strips mc key (save round-trip)
+// ---------------------------------------------------------------------------
+describe("T5-B4 – DependencyMap handleUnlinkMC: strips mc key from saved node", () => {
+  async function lastSavedMap(): Promise<DMap> {
+    const saveMock = (window as any).api.maps.save;
+    return saveMock.mock.calls[saveMock.mock.calls.length - 1][0] as DMap;
+  }
+
+  it("after unlinking, saved node has no 'mc' key", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    // Add node via CapturePanel
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "Linked risk" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBeGreaterThanOrEqual(1);
+    });
+
+    // Select + set uncertainty
+    fireEvent.click(screen.getByRole("button", { name: "Linked risk" }));
+    const uncRadio = await screen.findByRole("radio", { name: /uncertainty/i });
+    fireEvent.click(uncRadio);
+
+    // Push to MC (seeds mc block)
+    const simulateBtn = await screen.findByRole("button", { name: /simulate in § i/i });
+    fireEvent.click(simulateBtn);
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/mc"));
+
+    // Confirm mc is present in the saved map
+    await waitFor(async () => {
+      const saved = await lastSavedMap();
+      const node = saved.nodes.find((n: DependencyNode) => n.label === "Linked risk");
+      expect(node!.mc).toBeDefined();
+    });
+
+    // Now click Unlink
+    const unlinkBtn = await screen.findByRole("button", { name: /unlink/i });
+    fireEvent.click(unlinkBtn);
+
+    // Save explicitly
+    fireEvent.click(screen.getByTestId("map-save"));
+
+    // mc key must be absent
+    await waitFor(async () => {
+      const saved = await lastSavedMap();
+      const node = saved.nodes.find((n: DependencyNode) => n.label === "Linked risk");
+      expect(node).toBeDefined();
+      expect("mc" in node!).toBe(false);
+    });
   });
 });

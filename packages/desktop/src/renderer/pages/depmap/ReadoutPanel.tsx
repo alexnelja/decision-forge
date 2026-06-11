@@ -14,6 +14,7 @@
 
 import type { DependencyMap, Readout } from "@decision-forge/core";
 import { ROLE_OPTIONS, roleGlyph } from "./roles";
+import { formatRange } from "../../lib/format-range";
 
 export interface ReadoutPanelProps {
   map: DependencyMap;
@@ -143,11 +144,21 @@ export function ReadoutPanel({ map, readout, onSelect, onPushToMC }: ReadoutPane
         <Section label="Resolve Next" glyph={roleGlyph("uncertainty")!}>
           {resolveNext.map((entry) => {
             const label = nodeLabel(map, entry.nodeId);
+            const mapNode = map.nodes.find((n) => n.id === entry.nodeId);
+            const summary = mapNode?.mc?.summary;
+            const rangeStr = summary
+              ? ` · p10–p90: ${formatRange(summary.p10)}–${formatRange(summary.p90)}`
+              : undefined;
+            const reason = entry.reason
+              ? rangeStr
+                ? `${entry.reason}${rangeStr}`
+                : entry.reason
+              : rangeStr ?? undefined;
             return (
               <RowButton
                 key={entry.nodeId}
                 label={label}
-                reason={entry.reason}
+                reason={reason}
                 onClick={() => onSelect(entry.nodeId)}
                 onPushToMC={onPushToMC ? () => onPushToMC(entry.nodeId) : undefined}
                 simulateAriaLabel={`Simulate ${label} in Monte Carlo`}

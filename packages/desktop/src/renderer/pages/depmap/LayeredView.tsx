@@ -20,7 +20,8 @@ import ReactFlow, {
 } from "reactflow";
 
 import type { DependencyMap } from "@decision-forge/core";
-import { reachDownstream, reachUpstream } from "@decision-forge/core";
+import { reachDownstream, reachUpstream, isUnconfiguredDistribution } from "@decision-forge/core";
+import { formatRange } from "../../lib/format-range";
 import { layoutPositions } from "./layout";
 import type { Analysis } from "./useAnalysis";
 import { FactorNode, type FactorNodeData } from "./FactorNode";
@@ -344,6 +345,19 @@ function LayeredViewInner({
 
         const mapNode = mapNodeById.get(id);
 
+        // Compute mc chip text for linked uncertainty nodes
+        let mcChip: string | undefined;
+        if (mapNode?.mc) {
+          const { distribution, summary } = mapNode.mc;
+          if (isUnconfiguredDistribution(distribution)) {
+            mcChip = "→ § I";
+          } else if (summary) {
+            mcChip = `${formatRange(summary.p10)} · ${formatRange(summary.p50)} · ${formatRange(summary.p90)}`;
+          } else {
+            mcChip = "→ § I";
+          }
+        }
+
         return {
           ...n,
           data: {
@@ -363,6 +377,7 @@ function LayeredViewInner({
             dimOpacity,
             isDownstream,
             isUpstream,
+            mcChip,
             // callbacks always current
             onRename: onRenameNode,
             onCancelRename,

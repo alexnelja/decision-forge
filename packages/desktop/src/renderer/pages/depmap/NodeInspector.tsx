@@ -7,18 +7,22 @@
 
 import { useState, useEffect } from "react";
 import type { DependencyNode } from "@decision-forge/core";
+import { isUnconfiguredDistribution } from "@decision-forge/core";
 import { ROLE_OPTIONS, type NodeRole } from "./roles";
+import { formatRange } from "../../lib/format-range";
 
 interface NodeInspectorProps {
   node: DependencyNode | null;
   onUpdate: (id: string, patch: { label?: string; note?: string; role?: NodeRole }) => void;
   onDelete: (id: string) => void;
   onClose: () => void;
-  /** Optional: called when the user clicks "→ Simulate in § I" (uncertainty nodes only). */
+  /** Optional: called when the user clicks "→ Simulate in § I" or "Edit in § I" (uncertainty nodes only). */
   onPushToMC?: (id: string) => void;
+  /** Optional: called when the user clicks "Unlink" on a linked uncertainty node. */
+  onUnlinkMC?: (id: string) => void;
 }
 
-export function NodeInspector({ node, onUpdate, onDelete, onClose, onPushToMC }: NodeInspectorProps) {
+export function NodeInspector({ node, onUpdate, onDelete, onClose, onPushToMC, onUnlinkMC }: NodeInspectorProps) {
   // Local draft state so edits don't fire on every keystroke — commit on blur.
   const [labelDraft, setLabelDraft] = useState(node?.label ?? "");
   const [noteDraft, setNoteDraft] = useState(node?.note ?? "");
@@ -265,8 +269,132 @@ export function NodeInspector({ node, onUpdate, onDelete, onClose, onPushToMC }:
         Stores: id · label · note · role · position
       </p>
 
-      {/* → Simulate in § I — shown only for uncertainty nodes */}
-      {node.role === "uncertainty" && onPushToMC && (
+      {/* ── MC link section — shown for uncertainty nodes with an mc block ── */}
+      {node.role === "uncertainty" && node.mc && (() => {
+        const { mc } = node;
+        const unconfigured = isUnconfiguredDistribution(mc.distribution);
+        const dist = mc.distribution;
+
+        /** Render a param line for a distribution kind. */
+        function distParams() {
+          if (dist.kind === "triangular") {
+            return `min ${dist.min} · mode ${dist.mode} · max ${dist.max}`;
+          } else if (dist.kind === "normal") {
+            return `mean ${dist.mean} · sd ${dist.sd}`;
+          } else if (dist.kind === "uniform") {
+            return `min ${dist.min} · max ${dist.max}`;
+          } else if (dist.kind === "lognormal") {
+            return `meanlog ${dist.meanlog} · sdlog ${dist.sdlog}`;
+          } else if (dist.kind === "pert") {
+            return `min ${dist.min} · mode ${dist.mode} · max ${dist.max}`;
+          }
+          return "";
+        }
+
+        return (
+          <div
+            style={{
+              marginBottom: "10px",
+              padding: "8px",
+              background: "var(--paper-base, rgba(255,255,255,0.04))",
+              border: "1px solid var(--paper-rule)",
+              borderRadius: "4px",
+              fontSize: "11px",
+            }}
+          >
+            {/* Distribution kind */}
+            <div style={{ color: "var(--ink-dim)", marginBottom: "3px" }}>
+              <span style={{ fontWeight: 600, color: "var(--ink)", textTransform: "capitalize" }}>
+                {dist.kind}
+              </span>
+              {" "}
+              <span style={{ color: "var(--ink-faint)" }}>{distParams()}</span>
+            </div>
+
+            {/* Range or unconfigured hint */}
+            {unconfigured ? (
+              <div style={{ color: "var(--sec-mc, #6bbf8e)", fontSize: "10px", marginTop: "3px" }}>
+                → § I — set parameters in § I Monte Carlo
+              </div>
+            ) : mc.summary ? (
+              <div
+                style={{
+                  color: "var(--ink-dim)",
+                  fontSize: "10px",
+                  marginTop: "3px",
+                  letterSpacing: "0.03em",
+                }}
+              >
+                p10 · p50 · p90:{" "}
+                <span style={{ color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>
+                  {formatRange(mc.summary.p10)} · {formatRange(mc.summary.p50)} · {formatRange(mc.summary.p90)}
+                </span>
+              </div>
+            ) : null}
+
+            {/* Variable name chip */}
+            <div
+              style={{
+                marginTop: "5px",
+                fontFamily: "var(--font-mono, monospace)",
+                fontSize: "10px",
+                color: "var(--ink-faint)",
+              }}
+            >
+              var: {mc.varName}
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Edit in § I — for linked uncertainty nodes: re-register + navigate */}
+      {node.role === "uncertainty" && node.mc && onPushToMC && (
+        <button
+          aria-label="Edit in § I"
+          onClick={() => onPushToMC(node.id)}
+          style={{
+            width: "100%",
+            background: "none",
+            border: "1px solid var(--sec-mc, #6bbf8e)",
+            borderRadius: "3px",
+            color: "var(--sec-mc, #6bbf8e)",
+            fontSize: "11px",
+            padding: "5px 8px",
+            cursor: "pointer",
+            fontFamily: "var(--font-display, inherit)",
+            letterSpacing: "0.04em",
+            marginBottom: "4px",
+          }}
+        >
+          Edit in § I
+        </button>
+      )}
+
+      {/* Unlink — strips mc block (no confirm needed; recoverable via re-push) */}
+      {node.role === "uncertainty" && node.mc && onUnlinkMC && (
+        <button
+          aria-label="Unlink from § I"
+          onClick={() => onUnlinkMC(node.id)}
+          style={{
+            width: "100%",
+            background: "none",
+            border: "1px solid var(--ink-dim)",
+            borderRadius: "3px",
+            color: "var(--ink-dim)",
+            fontSize: "11px",
+            padding: "5px 8px",
+            cursor: "pointer",
+            fontFamily: "var(--font-display, inherit)",
+            letterSpacing: "0.04em",
+            marginBottom: "6px",
+          }}
+        >
+          Unlink
+        </button>
+      )}
+
+      {/* → Simulate in § I — shown for uncertainty nodes WITHOUT an mc block yet */}
+      {node.role === "uncertainty" && !node.mc && onPushToMC && (
         <button
           aria-label="→ Simulate in § I"
           onClick={() => onPushToMC(node.id)}

@@ -424,6 +424,24 @@ export default function DependencyMap() {
   }, [handleUpdateNode]);
 
   /**
+   * Unlink a node from its § I Monte Carlo variable.
+   * Strips the whole `mc` key from the node (key-removal destructure, same
+   * pattern as role="factor" stripping).  No confirm dialog — re-pushing
+   * recovers the link.
+   */
+  const handleUnlinkMC = useCallback((id: string) => {
+    setMap((prev) => ({
+      ...prev,
+      nodes: prev.nodes.map((n) => {
+        if (n.id !== id || !n.mc) return n;
+        const { mc: _mc, ...nodeWithoutMc } = n;
+        return nodeWithoutMc as typeof n;
+      }),
+      updatedAt: new Date().toISOString(),
+    }));
+  }, []);
+
+  /**
    * Push an uncertainty node to § I Monte Carlo.
    *
    * Phase 1 (sync): checks eligibility against fresh state (mapRef), computes
@@ -963,6 +981,7 @@ export default function DependencyMap() {
                     onDelete={handleDeleteNode}
                     onClose={() => setSelectedId(null)}
                     onPushToMC={handlePushToMC}
+                    onUnlinkMC={handleUnlinkMC}
                   />
                   <StructurePanel map={map} selectedId={selectedId} />
                 </div>
