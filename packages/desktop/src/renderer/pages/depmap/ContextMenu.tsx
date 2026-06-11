@@ -13,6 +13,7 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { DependencyEdge } from "@decision-forge/core";
 import { describeSign, describeConfidence } from "./edge-style";
 import { ROLE_OPTIONS } from "./roles";
@@ -120,7 +121,11 @@ export function ContextMenu(props: ContextMenuProps) {
     }
   }
 
-  return (
+  // Render into document.body via a portal so `position: fixed` is relative
+  // to the actual viewport — not to a transformed ancestor (react-flow's
+  // viewport/pane applies CSS transforms that make `position: fixed` children
+  // land at wrong positions relative to the window).
+  return createPortal(
     <div
       ref={menuRef}
       role="menu"
@@ -149,7 +154,8 @@ export function ContextMenu(props: ContextMenuProps) {
       {props.type === "edge" && (
         <EdgeMenuItems {...props} />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
 
