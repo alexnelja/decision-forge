@@ -380,3 +380,163 @@ describe("B7 – merged variables flow into mcApi.run", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// B8 — Broken link GENUINELY falls back to ad-hoc: edits stick, feed runs,
+//      name becomes editable, no maps.save attempted.
+// ---------------------------------------------------------------------------
+describe("B8 – broken link promotes to ad-hoc: edits stick and feed runs", () => {
+  beforeEach(() => {
+    setupMocks(null); // maps.load returns null = deleted map
+    seedLink();
+  });
+
+  it("an edit to the promoted variable STICKS and appears in the run config; no maps.save", async () => {
+    render(<MonteCarlo />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(VAR_NAME)).toBeInTheDocument();
+    });
+
+    const saveMock = (window as any).api.maps.save as ReturnType<typeof vi.fn>;
+
+    // Find the broken card and edit the SD param (fallback normal distribution)
+    const brokenBadge = screen.getByText(/link broken/i);
+    const card = brokenBadge.closest(".specimen") as HTMLElement;
+    expect(card).not.toBeNull();
+    fireEvent.change(within(card).getByLabelText(/σ\s+SD/i), { target: { value: "7" } });
+
+    // Let any async write-through (there must be none) settle
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+
+    // The edit STICKS — input did not snap back to the placeholder value
+    expect(
+      (within(card).getByLabelText(/σ\s+SD/i) as HTMLInputElement).value
+    ).toBe("7");
+
+    // And it feeds the run config
+    fireEvent.click(screen.getByRole("button", { name: /^run$/i }));
+    await waitFor(() => {
+      const runMock = (window as any).api.mc.run as ReturnType<typeof vi.fn>;
+      expect(runMock).toHaveBeenCalled();
+      const cfg = runMock.mock.calls[0]![0];
+      const v = cfg.variables.find((x: { name: string }) => x.name === VAR_NAME);
+      expect(v).toBeDefined();
+      expect(v.distribution.kind).toBe("normal");
+      expect(v.distribution.sd).toBe(7);
+    });
+
+    // Never any write-through for a broken link
+    expect(saveMock).not.toHaveBeenCalled();
+  });
+
+  it("the promoted variable's name input is editable (truly ad-hoc, not locked)", async () => {
+    render(<MonteCarlo />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(VAR_NAME)).toBeInTheDocument();
+    });
+    expect(screen.getByDisplayValue(VAR_NAME)).not.toBeDisabled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B9 — Write-throughs are SERIALIZED: rapid successive edits to different
+//      params must BOTH be present in the final saved payload.
+// ---------------------------------------------------------------------------
+describe("B9 – write-throughs serialized: rapid edits both persist", () => {
+  it("two quick edits to different params are both in the final saved payload", async () => {
+    clearMcLinks();
+    // Emulate disk: load returns the latest saved map (or the fixture);
+    // saves are DEFERRED so the second write-through overlaps the first.
+    let lastSaved: DMap | null = null;
+    const pendingResolves: Array<() => void> = [];
+    (window as any).api = {
+      maps: {
+        load: vi.fn().mockImplementation(() => Promise.resolve(lastSaved ?? makeMapFixture())),
+        save: vi.fn().mockImplementation((m: DMap) => {
+          lastSaved = m;
+          return new Promise<void>((res) => pendingResolves.push(() => res()));
+        }),
+        list: vi.fn().mockResolvedValue([]),
+        delete: vi.fn().mockResolvedValue(undefined),
+      },
+      mc: { run: vi.fn() },
+    };
+    seedLink();
+
+    render(<MonteCarlo />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(VAR_NAME)).toBeInTheDocument();
+    });
+
+    const badge = screen.getByText(/§ IV/);
+    const card = badge.closest(".specimen") as HTMLElement;
+    const saveMock = (window as any).api.maps.save as ReturnType<typeof vi.fn>;
+
+    // Two rapid edits: min then max — before any save resolves
+    fireEvent.change(within(card).getByLabelText(/a\s+Min/i), { target: { value: "5" } });
+    fireEvent.change(within(card).getByLabelText(/b\s+Max/i), { target: { value: "60" } });
+
+    // Serialization contract: only ONE save in flight at a time
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(1));
+    await act(async () => { pendingResolves[0]!(); });
+
+    await waitFor(() => expect(saveMock).toHaveBeenCalledTimes(2));
+    await act(async () => { pendingResolves[1]!(); });
+
+    // BOTH edits present in the final payload
+    const finalMap = saveMock.mock.calls[1]![0] as DMap;
+    const dist = finalMap.nodes.find((n) => n.id === NODE_ID)!.mc!.distribution;
+    expect(dist.kind).toBe("triangular");
+    if (dist.kind === "triangular") {
+      expect(dist.min).toBe(5);
+      expect(dist.max).toBe(60);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B10 — Save failure mid-session promotes the variable to ad-hoc with the
+//       edit preserved; no further save attempts.
+// ---------------------------------------------------------------------------
+describe("B10 – save failure mid-session promotes to ad-hoc", () => {
+  it("save rejection → ad-hoc with edit preserved, name editable, no further saves", async () => {
+    setupMocks(); // valid map fixture
+    (window as any).api.maps.save = vi.fn().mockRejectedValue(new Error("disk full"));
+    seedLink();
+
+    render(<MonteCarlo />);
+    await waitFor(() => {
+      expect(screen.getByDisplayValue(VAR_NAME)).toBeInTheDocument();
+    });
+
+    // Edit the mode param on the linked card → write-through save fails
+    const badge = screen.getByText(/§ IV/);
+    const card = badge.closest(".specimen") as HTMLElement;
+    fireEvent.change(within(card).getByLabelText(/c\s+Mode/i), { target: { value: "30" } });
+
+    // Promotion: broken note appears
+    await waitFor(() => {
+      expect(screen.getByText(/link broken/i)).toBeInTheDocument();
+    });
+
+    // The edit is preserved on the promoted card
+    const brokenCard = screen.getByText(/link broken/i).closest(".specimen") as HTMLElement;
+    expect(
+      (within(brokenCard).getByLabelText(/c\s+Mode/i) as HTMLInputElement).value
+    ).toBe("30");
+
+    // Name is now editable
+    expect(screen.getByDisplayValue(VAR_NAME)).not.toBeDisabled();
+
+    // Further edits do NOT attempt another save
+    const saveMock = (window as any).api.maps.save as ReturnType<typeof vi.fn>;
+    const callsAfterPromotion = saveMock.mock.calls.length;
+    fireEvent.change(within(brokenCard).getByLabelText(/c\s+Mode/i), { target: { value: "35" } });
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50));
+    });
+    expect(saveMock.mock.calls.length).toBe(callsAfterPromotion);
+  });
+});
