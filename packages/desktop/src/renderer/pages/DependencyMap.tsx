@@ -794,15 +794,3 @@ const activeIconBtnStyle: React.CSSProperties = {
   color: "#fff",
   border: "1px solid var(--sec-depmap)",
 };
-
-const toggleStyle: React.CSSProperties = {
-  ...btnStyle,
-  color: "var(--ink-dim)",
-};
-
-const activeToggleStyle: React.CSSProperties = {
-  ...btnStyle,
-  background: "var(--sec-depmap)",
-  color: "#fff",
-  border: "1px solid var(--sec-depmap)",
-};

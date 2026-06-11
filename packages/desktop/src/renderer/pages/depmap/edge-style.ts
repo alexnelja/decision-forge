@@ -2,7 +2,7 @@
  * edge-style.ts — pure helper for computing react-flow edge visual properties.
  *
  * Single source of truth for sign/confidence/cycle visual encoding.
- * Used by LayeredView (2D) and will be reused by ConstellationView (3D, Task 8).
+ * Used by LayeredView (2D) and ConstellationView (3D, via the raw hex twins below).
  *
  * Visual encoding (spec §1.3):
  *   sign "+"       → green stroke  (var(--plus))
