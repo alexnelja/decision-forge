@@ -821,7 +821,7 @@ export default function DependencyMap() {
                 style={{
                   flex: 1,
                   overflowY: "auto",
-                  background: "rgba(var(--paper-raised-rgb, 30, 28, 24), 0.88)",
+                  background: "rgba(21, 19, 15, 0.88)",
                   backdropFilter: "blur(6px)",
                   WebkitBackdropFilter: "blur(6px)",
                   borderLeft: "1px solid var(--paper-rule)",
