@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { setMcLinks, getMcLinks, addMcLink, clearMcLinks } from "../../src/renderer/lib/mc-link-store";
+import { setMcLinks, getMcLinks, addMcLink, removeMcLink, clearMcLinks } from "../../src/renderer/lib/mc-link-store";
 import { computeMcSummary } from "../../src/renderer/lib/mc-summary";
 
 beforeEach(() => clearMcLinks());
@@ -15,6 +15,17 @@ describe("mc-link-store", () => {
     addMcLink({ mapId: "m1", nodeId: "n1", varName: "demand" });
     setMcLinks([]);
     expect(getMcLinks()).toEqual([]);
+  });
+  it("removeMcLink removes only the binding with the matching nodeId", () => {
+    addMcLink({ mapId: "m1", nodeId: "n1", varName: "demand" });
+    addMcLink({ mapId: "m1", nodeId: "n2", varName: "price" });
+    removeMcLink("n1");
+    expect(getMcLinks()).toEqual([{ mapId: "m1", nodeId: "n2", varName: "price" }]);
+  });
+  it("removeMcLink on an unknown nodeId is a no-op", () => {
+    addMcLink({ mapId: "m1", nodeId: "n1", varName: "demand" });
+    removeMcLink("nope");
+    expect(getMcLinks()).toHaveLength(1);
   });
 });
 

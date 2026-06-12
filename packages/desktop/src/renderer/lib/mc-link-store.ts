@@ -21,6 +21,12 @@ export function addMcLink(link: McLink): void {
   _notify();
 }
 
+/** Remove the binding for a nodeId (no-op when absent). */
+export function removeMcLink(nodeId: string): void {
+  _links = _links.filter((l) => l.nodeId !== nodeId);
+  _notify();
+}
+
 /** Replace the entire set of bindings. */
 export function setMcLinks(links: McLink[]): void {
   _links = [...links];

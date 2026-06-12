@@ -714,11 +714,12 @@ describe("B7 – Failure contract: save rejection", () => {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// T5-B1 – FactorNode renders mc range chip via LayeredView data flags
-//   (tested indirectly via NodeInspector for the linked node state,
-//    and directly via the DependencyMap integration for the chip text)
+// T5-B1 – FactorNode canvas chip: see mc-handoff-chip.test.tsx (separate file
+//   because the reactflow-jsdom shim gives canvas nodes role="button", which
+//   would collide with this file's CapturePanel getByRole queries).
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
 // T5-B2 – NodeInspector shows distribution summary + Edit in § I + Unlink
 // ---------------------------------------------------------------------------
 describe("T5-B2 – NodeInspector: linked node shows distribution summary + actions", () => {
@@ -983,6 +984,9 @@ describe("T5-B4 – DependencyMap handleUnlinkMC: strips mc key from saved node"
       expect(node!.mc).toBeDefined();
     });
 
+    // The push registered a binding in the store
+    expect(getMcLinks().map((l) => l.varName)).toEqual(["linked_risk"]);
+
     // Now click Unlink
     const unlinkBtn = await screen.findByRole("button", { name: /unlink/i });
     fireEvent.click(unlinkBtn);
@@ -997,5 +1001,36 @@ describe("T5-B4 – DependencyMap handleUnlinkMC: strips mc key from saved node"
       expect(node).toBeDefined();
       expect("mc" in node!).toBe(false);
     });
+  });
+
+  it("unlinking also removes the binding from mc-link-store (no § I ghost)", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: "Ghost risk" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBeGreaterThanOrEqual(1);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: "Ghost risk" }));
+    const uncRadio = await screen.findByRole("radio", { name: /uncertainty/i });
+    fireEvent.click(uncRadio);
+
+    fireEvent.click(await screen.findByRole("button", { name: /simulate in § i/i }));
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/mc"));
+
+    // Binding registered by the push
+    expect(getMcLinks().map((l) => l.varName)).toEqual(["ghost_risk"]);
+
+    // Unlink → the store binding must be gone, otherwise § I keeps showing a
+    // session-visible variable that later promotes to a confusing
+    // "link broken" ad-hoc var.
+    fireEvent.click(await screen.findByRole("button", { name: /unlink/i }));
+    expect(getMcLinks()).toHaveLength(0);
   });
 });

@@ -11,7 +11,7 @@ import { ReadoutPanel } from "./depmap/ReadoutPanel";
 import type { NodeRole } from "./depmap/roles";
 import { useAnalysis } from "./depmap/useAnalysis";
 import { mapsApi } from "../lib/maps-api";
-import { addMcLink } from "../lib/mc-link-store";
+import { addMcLink, removeMcLink } from "../lib/mc-link-store";
 
 /**
  * Read the right-panel pinned preference from localStorage.
@@ -439,6 +439,9 @@ export default function DependencyMap() {
       }),
       updatedAt: new Date().toISOString(),
     }));
+    // Clear the § I binding too, or the stale link would later surface in
+    // Monte Carlo as a confusing "link broken" ad-hoc promotion.
+    removeMcLink(id);
   }, []);
 
   /**
