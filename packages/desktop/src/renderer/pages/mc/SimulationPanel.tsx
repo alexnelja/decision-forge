@@ -75,10 +75,13 @@ function BigStat({
 
 export function SimulationPanel({
   config,
-  onRun
+  onRun,
+  linkedVarNames = []
 }: {
   config: MCConfig;
   onRun: (cfg: MCConfig) => Promise<MCRunResult>;
+  /** Names of linked (§ IV) variables for the formula-chip affordance. */
+  linkedVarNames?: string[];
 }) {
   const [formula, setFormula] = useState(config.formula);
   const [iterations, setIterations] = useState(config.iterations);
@@ -91,6 +94,13 @@ export function SimulationPanel({
   const [runCount, setRunCount] = useState(0);
 
   useEffect(() => setFormula(config.formula), [config.formula]);
+
+  /** varNames that are not yet referenced in the current formula draft.
+   *  Word-boundary match: `x` must not count as referenced inside `max(`.
+   *  varNames satisfy /^[A-Za-z][A-Za-z0-9_]*$/ so no regex escaping needed. */
+  const unreferencedLinkedVars = linkedVarNames.filter(
+    (name) => !new RegExp(`\\b${name}\\b`).test(formula)
+  );
 
   // Build histograms over a SHARED x-range so two runs are visually comparable.
   const sharedRange = useMemo(() => {
@@ -159,6 +169,31 @@ export function SimulationPanel({
             letterSpacing: "-0.015em"
           }}
         />
+        {/* "use <varName>" chips for linked variables not yet in the formula */}
+        {unreferencedLinkedVars.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {unreferencedLinkedVars.map((name) => (
+              <button
+                key={name}
+                type="button"
+                aria-label={`use ${name}`}
+                onClick={() => {
+                  // The chip edits ONLY the local draft — the parent syncs on
+                  // Run, exactly as for typed edits. (Touching the parent here
+                  // re-triggered the config.formula sync effect and destroyed
+                  // any typed-but-unrun draft.)
+                  setFormula((prev) => {
+                    const trimmed = prev.trim();
+                    return trimmed ? `${trimmed} + ${name}` : name;
+                  });
+                }}
+                className="border border-ink-faint bg-transparent px-2 py-0.5 font-mono text-[10px] tracking-[0.18em] text-ink-dim hover:border-ink hover:text-ink transition-colors"
+              >
+                use {name}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Run button + iterations */}

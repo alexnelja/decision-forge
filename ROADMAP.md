@@ -103,14 +103,35 @@ All 8 second-round usability feedback items addressed:
 
 **Final test counts:** 77 core · 189 desktop unit · 8 e2e (all green)
 
-### v1.5 deferred
+### v1.6 § IV → § I Monte Carlo hand-off shipped (2026-06-12) — branch `feat/depmap-mc-handoff`
+
+**Design spec:** `docs/superpowers/specs/2026-06-11-depmap-mc-handoff-design.md`
+**Implementation plan:** `docs/superpowers/plans/2026-06-11-depmap-mc-handoff.md`
+**Commits:** `daa9dde`…`96543bc` (Tasks 1-5) + e2e + docs (Task 6)
+
+Architecture: map file is the single source of truth (`node.mc` block); a renderer-global `mc-link-store` (mirroring the BATNA `mc-store` pattern) signals § I which map-linked variables to display; § I edits write through via the existing `mapsApi`. No backend changes.
+
+- [x] `DependencyNodeSchema` extended with optional `mc` block (`varName`, `distribution`, `summary`) (`daa9dde`)
+- [x] `mcVarName` slug helper (reserved-word guard) + `isUnconfiguredDistribution` predicate in `@decision-forge/core` (`daa9dde`, `e6ce315`)
+- [x] `mc-link-store.ts` + `computeMcSummary` (client-side input-distribution summary) (`38ea519`)
+- [x] `handlePushToMC` in `DependencyMap.tsx`: right-click "→ Simulate" / inspector button / readout button seeds `node.mc {varName, triangular 0/0/0}`, saves map, registers binding, navigates to § I (`ac2bbe9`, `8616bdf`)
+- [x] Role-change away from uncertainty strips the `mc` key (`96543bc`)
+- [x] § I `MonteCarlo.tsx`: linked variables appear badged `§ IV · <label>`, edits write through to the map file with recomputed `p10/p50/p90` summary; broken links promote to ad-hoc; ad-hoc name deduplication guards against collisions (`81b8a60`, `e59a4d7`, `f971bf2`)
+- [x] § IV `FactorNode.tsx`: `mc-chip` (`data-testid="mc-chip"`) shows range triple or `→ § I` for unconfigured links (`e05e289`)
+- [x] NodeInspector: distribution summary + "Edit in § I" + "Unlink" for linked uncertainty nodes; "→ Simulate in § I" for unlinked uncertainty nodes (`e05e289`, `96543bc`)
+- [x] ReadoutPanel: Resolve-next rows append `· p10–p90` range suffix for linked nodes (`e05e289`)
+- [x] e2e: new `depmap.spec.ts` test — § IV add node → role Uncertainty → push → § I badge → triangular 10/25/50 → § IV chip → Save/Open round-trip; existing gesture-flow spec fixed (h1 overlay `force: true` + conditional glyph assertions)
+
+**Final test counts:** 92 core · 310 desktop unit · 3 depmap e2e + 1 scenarios e2e pass without sidecar (sidecar-dependent specs require Python process)
+
+### v1.5 deferred (remaining)
 
 - [ ] DEMATEL-lite leverage scores (total-influence matrix T)
-- [ ] Monte Carlo / Forecast hand-off — link a map node to an MC variable and propagate uncertainty estimates
 
 ## Cross-cutting / Later
 
 - [x] E2E tests with Playwright (`packages/desktop/tests/e2e/`) — 8 specs: smoke, forecast, mc, nego, nego-batna, scenarios, depmap (navigate/add), depmap (redesigned gesture flow) — all green (2026-06-10)
+- [x] § IV → § I MC hand-off e2e: depmap spec extended with MC round-trip test (2026-06-12)
 - [/] Cross-module integration — partial: `LogForecastButton` bridges MC § III → Forecast § I; MC → BATNA (`{refMCVar, percentile}` in Nego) shipped (Plan 4.5). Reverse direction (forecast → MC param distribution) still open
 - [ ] Visual/interaction polish per design §10
 - [ ] Packaging, code-signing, auto-update

@@ -20,7 +20,8 @@ import ReactFlow, {
 } from "reactflow";
 
 import type { DependencyMap } from "@decision-forge/core";
-import { reachDownstream, reachUpstream } from "@decision-forge/core";
+import { reachDownstream, reachUpstream, isUnconfiguredDistribution } from "@decision-forge/core";
+import { formatRangeTriple } from "../../lib/format-range";
 import { layoutPositions } from "./layout";
 import type { Analysis } from "./useAnalysis";
 import { FactorNode, type FactorNodeData } from "./FactorNode";
@@ -80,6 +81,7 @@ export interface LayeredViewProps {
   onCancelRename: (id: string) => void;
   onStartRename: (id: string) => void;
   onSetRole: (id: string, role: "objective" | "lever" | "uncertainty" | "factor") => void;
+  onPushToMC?: (id: string) => void;
   // Task 6 edge mutation props
   onFlipEdge: (id: string) => void;
   onCycleEdgeSign: (id: string) => void;
@@ -151,6 +153,7 @@ function LayeredViewInner({
   onCancelRename,
   onStartRename,
   onSetRole,
+  onPushToMC,
   onFlipEdge,
   onCycleEdgeSign,
   onToggleEdgeConfidence,
@@ -342,6 +345,19 @@ function LayeredViewInner({
 
         const mapNode = mapNodeById.get(id);
 
+        // Compute mc chip text for linked uncertainty nodes
+        let mcChip: string | undefined;
+        if (mapNode?.mc) {
+          const { distribution, summary } = mapNode.mc;
+          if (isUnconfiguredDistribution(distribution)) {
+            mcChip = "→ § I";
+          } else if (summary) {
+            mcChip = formatRangeTriple(summary);
+          } else {
+            mcChip = "→ § I";
+          }
+        }
+
         return {
           ...n,
           data: {
@@ -361,6 +377,7 @@ function LayeredViewInner({
             dimOpacity,
             isDownstream,
             isUpstream,
+            mcChip,
             // callbacks always current
             onRename: onRenameNode,
             onCancelRename,
@@ -566,6 +583,7 @@ function LayeredViewInner({
         x: evt.clientX,
         y: evt.clientY,
         nodeId: node.id,
+        role: node.data.role,
         onRename: (id) => {
           onSelect(id);
           onStartRename(id);
@@ -573,10 +591,11 @@ function LayeredViewInner({
         onDuplicate: duplicateNode,
         onSetRole: onSetRole,
         onDelete: onDeleteNode,
+        onPushToMC: onPushToMC,
         onClose: closeContextMenu,
       });
     },
-    [onSelect, onStartRename, duplicateNode, onSetRole, onDeleteNode, closeContextMenu]
+    [onSelect, onStartRename, duplicateNode, onSetRole, onPushToMC, onDeleteNode, closeContextMenu]
   );
 
   // Pane context menu — wired on the wrapper div rather than onPaneContextMenu

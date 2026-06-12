@@ -1,8 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { MCConfig, MCRunResult, MCVariable } from "@decision-forge/core";
+import type { DependencyMap } from "@decision-forge/core";
 import { ModuleFrame } from "../components/ModuleFrame";
 import { mcApi } from "../lib/mc-api";
 import { setLatestMCVariables } from "../lib/mc-store";
+import { useMcLinks } from "../lib/mc-link-store";
+import { mapsApi } from "../lib/maps-api";
+import { computeMcSummary } from "../lib/mc-summary";
 import { VariableCard } from "./mc/VariableCard";
 import { SimulationPanel } from "./mc/SimulationPanel";
 import { LogForecastButton } from "./mc/LogForecastButton";
@@ -16,18 +20,150 @@ const DEFAULT_CONFIG: MCConfig = {
   iterations: 10_000
 };
 
+/** Per-link metadata so we know how to write back + what to display.
+ *  Only healthy links live here — broken links are promoted to ad-hoc. */
+interface LinkedMeta {
+  mapId: string;
+  nodeId: string;
+  label: string;
+  note?: string;
+}
+
 export default function MonteCarlo() {
   const [variables, setVariables] = useState<MCVariable[]>(DEFAULT_CONFIG.variables);
   const [formula, setFormula] = useState(DEFAULT_CONFIG.formula);
   const [iterations, setIterations] = useState(DEFAULT_CONFIG.iterations);
   const [result, setResult] = useState<MCRunResult | null>(null);
 
-  const config: MCConfig = { variables, formula, iterations };
+  // Linked variables from § IV (mc-link-store)
+  const links = useMcLinks();
+  const [linkedVars, setLinkedVars] = useState<MCVariable[]>([]);
+  const [linkedMeta, setLinkedMeta] = useState<Map<string, LinkedMeta>>(new Map());
+  // Names of ad-hoc variables that USED to be linked (broken-link promotions);
+  // drives the one-time "link broken — now ad-hoc" note on their cards.
+  const [brokenNames, setBrokenNames] = useState<Set<string>>(new Set());
 
-  // Publish variables to the shared store so Negotiation can link a BATNA
+  // Cache maps by mapId so we don't re-load the same map repeatedly
+  const mapCache = useRef<Map<string, DependencyMap | null>>(new Map());
+
+  // Mirrors for queued write-throughs / async load paths (avoid stale closures)
+  const linkedMetaRef = useRef(linkedMeta);
+  linkedMetaRef.current = linkedMeta;
+  const linkedVarsRef = useRef(linkedVars);
+  linkedVarsRef.current = linkedVars;
+  const variablesRef = useRef(variables);
+  variablesRef.current = variables;
+
+  // Single promise chain so write-throughs are SERIALIZED: each load sees the
+  // previous save, so rapid successive edits never drop earlier patches.
+  const writeQueue = useRef<Promise<void>>(Promise.resolve());
+
+  /** Broken link → genuinely ad-hoc: drop from the linked path, append to the
+   *  ad-hoc array (edits stick, feed runs, name editable), flag the note.
+   *  Prefers the CURRENT optimistic value over the failing write's payload so
+   *  a superseded edit is never resurrected. */
+  function promoteToAdHoc(varName: string, fallback: MCVariable) {
+    const current =
+      linkedVarsRef.current.find((v) => v.name === varName) ?? fallback;
+    setLinkedVars((prev) => prev.filter((v) => v.name !== varName));
+    setLinkedMeta((prev) => {
+      const next = new Map(prev);
+      next.delete(varName);
+      return next;
+    });
+    setVariables((prev) =>
+      prev.some((v) => v.name === varName) ? prev : [...prev, current]
+    );
+    setBrokenNames((prev) => new Set(prev).add(varName));
+  }
+
+  // Load linked variables from their map files whenever links change
   useEffect(() => {
-    setLatestMCVariables(variables);
-  }, [variables]);
+    if (links.length === 0) {
+      setLinkedVars([]);
+      setLinkedMeta(new Map());
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadLinks() {
+      const newVars: MCVariable[] = [];
+      const newMeta = new Map<string, LinkedMeta>();
+      const promotions: MCVariable[] = [];
+
+      for (const link of links) {
+        // Load (or use cached) map
+        if (!mapCache.current.has(link.mapId)) {
+          const map = await mapsApi.load(link.mapId).catch(() => null);
+          mapCache.current.set(link.mapId, map);
+        }
+        const map = mapCache.current.get(link.mapId) ?? null;
+        const node = map?.nodes.find((n) => n.id === link.nodeId);
+
+        if (!map || !node?.mc) {
+          // Broken link — map deleted, node gone, or mc removed.
+          // Promote to ad-hoc with a placeholder (original unrecoverable).
+          promotions.push({
+            name: link.varName,
+            distribution: { kind: "normal", mean: 0, sd: 1 }
+          });
+          continue;
+        }
+
+        // Key variable AND meta both off node.mc.varName (the persisted truth);
+        // link.varName could drift from the map file and silently break the
+        // badge + write-through pairing.
+        const varName = node.mc.varName;
+
+        // Dedup against existing ad-hoc names (mirrors the promotion branch):
+        // a restored link must not coexist with its promoted twin under one
+        // name — the ad-hoc variable stays authoritative for this session.
+        if (variablesRef.current.some((v) => v.name === varName)) continue;
+
+        newVars.push({ name: varName, distribution: node.mc.distribution });
+        newMeta.set(varName, {
+          mapId: link.mapId,
+          nodeId: link.nodeId,
+          label: node.label,
+          note: node.note,
+        });
+      }
+
+      if (!cancelled) {
+        setLinkedVars(newVars);
+        setLinkedMeta(newMeta);
+        if (promotions.length > 0) {
+          setVariables((prev) => {
+            const existing = new Set(prev.map((v) => v.name));
+            const toAdd = promotions.filter((p) => !existing.has(p.name));
+            return toAdd.length > 0 ? [...prev, ...toAdd] : prev;
+          });
+          setBrokenNames((prev) => {
+            const next = new Set(prev);
+            for (const p of promotions) next.add(p.name);
+            return next;
+          });
+        }
+      }
+    }
+
+    // Invalidate the map cache when links change so we re-load fresh data
+    mapCache.current.clear();
+    void loadLinks();
+    return () => { cancelled = true; };
+  }, [links]);
+
+  // Merged list: linked first, then ad-hoc
+  const allVariables = [...linkedVars, ...variables];
+
+  // Publish merged variables to the shared store so Negotiation can link a BATNA
+  useEffect(() => {
+    setLatestMCVariables(allVariables);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [linkedVars, variables]);
+
+  const config: MCConfig = { variables: allVariables, formula, iterations };
 
   async function handleRun(cfg: MCConfig): Promise<MCRunResult> {
     setFormula(cfg.formula);
@@ -36,6 +172,8 @@ export default function MonteCarlo() {
     setResult(r);
     return r;
   }
+
+  // --- Ad-hoc variable handlers (index-based into the ad-hoc array only) ---
 
   function updateVariable(index: number, updated: MCVariable) {
     setVariables((prev) => prev.map((v, i) => (i === index ? updated : v)));
@@ -46,14 +184,93 @@ export default function MonteCarlo() {
   }
 
   function addVariable() {
-    setVariables((prev) => [
-      ...prev,
-      {
-        name: `x${prev.length + 1}`,
-        distribution: { kind: "normal", mean: 0, sd: 1 }
+    // Deduplicate against all linked varNames (they're persisted and win)
+    const linkedNames = new Set(linkedVars.map((v) => v.name));
+    setVariables((prev) => {
+      // Find a name that doesn't collide with linked vars or existing ad-hoc vars
+      const existing = new Set([
+        ...linkedNames,
+        ...prev.map((v) => v.name)
+      ]);
+      let candidate = `x${prev.length + 1}`;
+      let i = prev.length + 1;
+      while (existing.has(candidate)) {
+        i++;
+        candidate = `x${i}`;
       }
-    ]);
+      return [
+        ...prev,
+        {
+          name: candidate,
+          distribution: { kind: "normal", mean: 0, sd: 1 }
+        }
+      ];
+    });
   }
+
+  // --- Linked variable write-through handler ---
+
+  function updateLinkedVariable(varName: string, updated: MCVariable) {
+    if (!linkedMetaRef.current.has(varName)) return;
+
+    // Optimistic local update FIRST so rapid successive edits compose (the
+    // next edit's onChange receives a distribution that includes this one).
+    setLinkedVars((prev) =>
+      prev.map((v) => (v.name === varName ? updated : v))
+    );
+
+    // Serialize write-throughs: each load sees the previous save.
+    writeQueue.current = writeQueue.current
+      .then(() => doWriteThrough(varName, updated))
+      .catch(() => { /* keep the chain alive */ });
+  }
+
+  async function doWriteThrough(varName: string, updated: MCVariable) {
+    // Re-read meta at execution time — the link may have been promoted to
+    // ad-hoc (broken) by an earlier queued write.
+    const meta = linkedMetaRef.current.get(varName);
+    if (!meta) return;
+
+    try {
+      const map = await mapsApi.load(meta.mapId);
+      const node = map?.nodes.find((n) => n.id === meta.nodeId);
+      if (!map || !node?.mc) {
+        // Map deleted (or node/mc gone) mid-session — fall back to ad-hoc,
+        // preserving the user's edit. Never silently lost.
+        promoteToAdHoc(varName, updated);
+        return;
+      }
+
+      const newSummary = computeMcSummary(updated.distribution);
+
+      const patchedMap: DependencyMap = {
+        ...map,
+        nodes: map.nodes.map((n) => {
+          if (n.id !== meta.nodeId) return n;
+          return {
+            ...n,
+            mc: {
+              ...n.mc!,
+              distribution: updated.distribution,
+              summary: newSummary,
+            },
+          };
+        }),
+        updatedAt: new Date().toISOString(),
+      };
+
+      await mapsApi.save(patchedMap);
+
+      // Update cache
+      mapCache.current.set(meta.mapId, patchedMap);
+    } catch {
+      // Load/save failure — fall back to ad-hoc, preserving the user's edit.
+      promoteToAdHoc(varName, updated);
+    }
+  }
+
+  // Collect linked varNames to pass to SimulationPanel for the formula chip
+  const linkedVarNames = linkedVars.map((v) => v.name);
 
   return (
     <ModuleFrame
@@ -97,7 +314,7 @@ export default function MonteCarlo() {
               </div>
               <div className="flex justify-between">
                 <dt className="text-ink-dim">variables</dt>
-                <dd className="tabular-nums text-ink">{variables.length}</dd>
+                <dd className="tabular-nums text-ink">{allVariables.length}</dd>
               </div>
               <div className="flex justify-between">
                 <dt className="text-ink-dim">resolved</dt>
@@ -131,18 +348,43 @@ export default function MonteCarlo() {
               className="font-mono text-[10px] text-ink-faint tabular-nums"
               style={{ letterSpacing: "0.18em" }}
             >
-              {variables.length.toString().padStart(2, "0")}
+              {allVariables.length.toString().padStart(2, "0")}
             </span>
           </div>
+
+          {/* Linked variables — separate keyed path, never feed indices to ad-hoc handlers */}
+          {linkedVars.map((v) => {
+            const meta = linkedMeta.get(v.name);
+            return (
+              <VariableCard
+                key={`linked:${v.name}`}
+                variable={v}
+                onChange={(updated) => updateLinkedVariable(v.name, updated)}
+                onRemove={() => {
+                  // unreachable: removable={false} hides the button
+                }}
+                linkedLabel={meta?.label}
+                linkedNote={meta?.note}
+                nameLocked
+                removable={false}
+              />
+            );
+          })}
+
+          {/* Ad-hoc variables — index-based handlers into the ad-hoc array.
+              Promoted broken-link variables render here, fully editable,
+              with a one-time "link broken — now ad-hoc" note. */}
           {variables.map((v, i) => (
             <VariableCard
-              key={i}
+              key={`adhoc:${i}`}
               variable={v}
               onChange={(u) => updateVariable(i, u)}
               onRemove={() => removeVariable(i)}
               index={i}
+              linkedBroken={brokenNames.has(v.name)}
             />
           ))}
+
           <button
             type="button"
             onClick={addVariable}
@@ -162,7 +404,11 @@ export default function MonteCarlo() {
             <div className="eyebrow">II. Engine</div>
             <span className="meta italic">Python sidecar · numpy-vectorised</span>
           </div>
-          <SimulationPanel config={config} onRun={handleRun} />
+          <SimulationPanel
+            config={config}
+            onRun={handleRun}
+            linkedVarNames={linkedVarNames}
+          />
         </div>
       </div>
     </ModuleFrame>

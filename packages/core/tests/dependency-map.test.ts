@@ -68,3 +68,31 @@ describe("DependencyMapSchema", () => {
     expect((parsed.nodes[0] as any).controllability).toBeUndefined();
   });
 });
+
+// --- v1.6 mc block ---
+describe("DependencyMapSchema mc block", () => {
+  it("accepts an mc block on a node and round-trips it", () => {
+    const m = base();
+    (m.nodes[0] as any).mc = {
+      varName: "transnet_tender",
+      distribution: { kind: "triangular", min: 10, mode: 25, max: 50 },
+      summary: { p10: 14, p50: 26, p90: 44, mean: 27.5, definedAt: "2026-06-11T12:00:00Z" }
+    };
+    const parsed = S.parse(m);
+    expect((parsed.nodes[0] as any).mc?.varName).toBe("transnet_tender");
+  });
+
+  it("rejects an mc block with an invalid varName", () => {
+    const m = base();
+    (m.nodes[0] as any).mc = {
+      varName: "3rd_party", // must start with a letter
+      distribution: { kind: "triangular", min: 0, mode: 0, max: 0 }
+    };
+    expect(S.safeParse(m).success).toBe(false);
+  });
+
+  it("mc block is optional and absent by default", () => {
+    const parsed = S.parse(base());
+    expect("mc" in parsed.nodes[0]!).toBe(false);
+  });
+});

@@ -55,6 +55,11 @@ export interface FactorNodeData {
   dimOpacity?: number;
   isDownstream?: boolean;
   isUpstream?: boolean;
+  /** MC range chip text (threaded from LayeredView's style-sync effect).
+   *  - undefined: node has no mc link (no chip rendered)
+   *  - "→ § I": node is linked but unconfigured (all-zero triangular, no summary)
+   *  - "p10 · p50 · p90" formatted string: node has a summary */
+  mcChip?: string;
   // callbacks
   onRename: (id: string, label: string) => void;
   onCancelRename: (id: string) => void;
@@ -377,6 +382,24 @@ export function FactorNode({ id, data, selected }: NodeProps<FactorNodeData>) {
           <span style={{ pointerEvents: "none" }}>{data.label}</span>
         )}
       </div>
+
+      {/* ── MC range chip: shown for linked uncertainty nodes ── */}
+      {data.mcChip && !data.renaming && (
+        <div
+          data-testid="mc-chip"
+          style={{
+            fontSize: "10px",
+            color: "var(--ink-faint)",
+            letterSpacing: "0.03em",
+            lineHeight: 1.3,
+            marginTop: "2px",
+            pointerEvents: "none",
+            fontVariantNumeric: "tabular-nums",
+          }}
+        >
+          {data.mcChip}
+        </div>
+      )}
     </div>
   );
 }

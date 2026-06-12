@@ -1,5 +1,6 @@
 // packages/core/src/schemas/dependency-map.ts
 import { z } from "zod";
+import { DistributionSchema } from "./mc-config.js"; // same package, no cycle: mc-config imports nothing from here
 
 const uuid = z.string().uuid();
 const iso = z.string().regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/);
@@ -12,7 +13,19 @@ export const DependencyNodeSchema = z.object({
    *  older maps without it still parse (dagre auto-layout fills the gap). */
   position: z.object({ x: z.number(), y: z.number() }).optional(),
   /** v1.5 — drives the Decision Readout. Absent ≡ "factor". */
-  role: z.enum(["objective", "lever", "uncertainty", "factor"]).optional()
+  role: z.enum(["objective", "lever", "uncertainty", "factor"]).optional(),
+  /** § IV → § I Monte Carlo link (v1.6). Only meaningful on role="uncertainty";
+   *  schema stays permissive — the UI enforces the role restriction. */
+  mc: z.object({
+    /** Identifier used in § I formulas — must satisfy MCVariableSchema.name. */
+    varName: z.string().regex(/^[A-Za-z][A-Za-z0-9_]*$/),
+    distribution: DistributionSchema,
+    /** Derived from `distribution` on every edit (client-side sampling). */
+    summary: z.object({
+      p10: z.number(), p50: z.number(), p90: z.number(), mean: z.number(),
+      definedAt: iso
+    }).optional()
+  }).optional()
 });
 export type DependencyNode = z.infer<typeof DependencyNodeSchema>;
 

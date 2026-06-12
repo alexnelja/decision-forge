@@ -27,11 +27,15 @@ export interface NodeContextMenuProps {
   x: number;
   y: number;
   nodeId: string;
+  /** Current role of the node — used to decide whether to show "→ Simulate". */
+  role?: "objective" | "lever" | "uncertainty" | "factor";
   onRename: (id: string) => void;
   onDuplicate: (id: string) => void;
   onSetRole: (id: string, role: "objective" | "lever" | "uncertainty" | "factor") => void;
   onDelete: (id: string) => void;
   onClose: () => void;
+  /** Optional: fires when "→ Simulate" is clicked (uncertainty nodes only). */
+  onPushToMC?: (id: string) => void;
 }
 
 export interface PaneContextMenuProps {
@@ -164,7 +168,7 @@ export function ContextMenu(props: ContextMenuProps) {
 // ---------------------------------------------------------------------------
 
 function NodeMenuItems(props: NodeContextMenuProps) {
-  const { nodeId, onRename, onDuplicate, onSetRole, onDelete, onClose } = props;
+  const { nodeId, role, onRename, onDuplicate, onSetRole, onDelete, onClose, onPushToMC } = props;
 
   return (
     <>
@@ -188,6 +192,16 @@ function NodeMenuItems(props: NodeContextMenuProps) {
           indent
         />
       ))}
+      {/* → Simulate — only for uncertainty nodes */}
+      {role === "uncertainty" && onPushToMC && (
+        <>
+          <MenuDivider />
+          <MenuItem
+            label="→ Simulate"
+            onClick={() => { onPushToMC(nodeId); onClose(); }}
+          />
+        </>
+      )}
       <MenuDivider />
       <MenuItem
         label="Delete"
