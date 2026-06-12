@@ -402,11 +402,15 @@ export default function DependencyMap() {
         if (patch.role === "factor") {
           const { role: _patchRole, ...patchRest } = patch;
           const { role: _nodeRole, mc: _mc, ...nodeRest } = n;
+          // Mirror handleUnlinkMC: strip the map node AND clear the store binding.
+          if (n.mc) removeMcLink(id);
           return { ...nodeRest, ...patchRest };
         }
         // Role change away from uncertainty strips the mc block (key removal).
         if (patch.role !== undefined && patch.role !== "uncertainty" && n.mc) {
           const { mc: _mc, ...nodeWithoutMc } = n;
+          // Mirror handleUnlinkMC: clear the store binding to prevent § I ghost.
+          removeMcLink(id);
           return { ...nodeWithoutMc, ...patch };
         }
         return { ...n, ...patch };

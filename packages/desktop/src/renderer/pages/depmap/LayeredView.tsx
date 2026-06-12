@@ -21,7 +21,7 @@ import ReactFlow, {
 
 import type { DependencyMap } from "@decision-forge/core";
 import { reachDownstream, reachUpstream, isUnconfiguredDistribution } from "@decision-forge/core";
-import { formatRange } from "../../lib/format-range";
+import { formatRangeTriple } from "../../lib/format-range";
 import { layoutPositions } from "./layout";
 import type { Analysis } from "./useAnalysis";
 import { FactorNode, type FactorNodeData } from "./FactorNode";
@@ -352,7 +352,7 @@ function LayeredViewInner({
           if (isUnconfiguredDistribution(distribution)) {
             mcChip = "→ § I";
           } else if (summary) {
-            mcChip = `${formatRange(summary.p10)} · ${formatRange(summary.p50)} · ${formatRange(summary.p90)}`;
+            mcChip = formatRangeTriple(summary);
           } else {
             mcChip = "→ § I";
           }

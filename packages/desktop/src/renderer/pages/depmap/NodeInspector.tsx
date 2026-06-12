@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import type { DependencyNode } from "@decision-forge/core";
 import { isUnconfiguredDistribution } from "@decision-forge/core";
 import { ROLE_OPTIONS, type NodeRole } from "./roles";
-import { formatRange } from "../../lib/format-range";
+import { formatRange, formatRangeTriple } from "../../lib/format-range";
 
 interface NodeInspectorProps {
   node: DependencyNode | null;
@@ -276,19 +276,28 @@ export function NodeInspector({ node, onUpdate, onDelete, onClose, onPushToMC, o
         const dist = mc.distribution;
 
         /** Render a param line for a distribution kind. */
-        function distParams() {
-          if (dist.kind === "triangular") {
-            return `min ${dist.min} · mode ${dist.mode} · max ${dist.max}`;
-          } else if (dist.kind === "normal") {
-            return `mean ${dist.mean} · sd ${dist.sd}`;
-          } else if (dist.kind === "uniform") {
-            return `min ${dist.min} · max ${dist.max}`;
-          } else if (dist.kind === "lognormal") {
-            return `meanlog ${dist.meanlog} · sdlog ${dist.sdlog}`;
-          } else if (dist.kind === "pert") {
-            return `min ${dist.min} · mode ${dist.mode} · max ${dist.max}`;
+        function distParams(): string {
+          switch (dist.kind) {
+            case "triangular":
+              return `min ${formatRange(dist.min)} · mode ${formatRange(dist.mode)} · max ${formatRange(dist.max)}`;
+            case "normal":
+              return `mean ${formatRange(dist.mean)} · sd ${formatRange(dist.sd)}`;
+            case "uniform":
+              return `min ${formatRange(dist.min)} · max ${formatRange(dist.max)}`;
+            case "lognormal":
+              return `meanlog ${formatRange(dist.meanlog)} · sdlog ${formatRange(dist.sdlog)}`;
+            case "pert": {
+              const base = `min ${formatRange(dist.min)} · mode ${formatRange(dist.mode)} · max ${formatRange(dist.max)}`;
+              return dist.lambda !== undefined ? `${base} · λ ${formatRange(dist.lambda)}` : base;
+            }
+            case "empirical":
+              return `${dist.samples.length} samples`;
+            default: {
+              // Exhaustiveness guard — TypeScript will flag if a new kind is added.
+              const _exhaustive: never = dist;
+              return "";
+            }
           }
-          return "";
         }
 
         return (
@@ -327,7 +336,7 @@ export function NodeInspector({ node, onUpdate, onDelete, onClose, onPushToMC, o
               >
                 p10 · p50 · p90:{" "}
                 <span style={{ color: "var(--ink)", fontVariantNumeric: "tabular-nums" }}>
-                  {formatRange(mc.summary.p10)} · {formatRange(mc.summary.p50)} · {formatRange(mc.summary.p90)}
+                  {formatRangeTriple(mc.summary)}
                 </span>
               </div>
             ) : null}

@@ -148,12 +148,8 @@ export function ReadoutPanel({ map, readout, onSelect, onPushToMC }: ReadoutPane
             const summary = mapNode?.mc?.summary;
             const rangeStr = summary
               ? ` · p10–p90: ${formatRange(summary.p10)}–${formatRange(summary.p90)}`
-              : undefined;
-            const reason = entry.reason
-              ? rangeStr
-                ? `${entry.reason}${rangeStr}`
-                : entry.reason
-              : rangeStr ?? undefined;
+              : "";
+            const reason = summary ? `${entry.reason}${rangeStr}` : entry.reason;
             return (
               <RowButton
                 key={entry.nodeId}

@@ -770,9 +770,33 @@ describe("T5-B2 – NodeInspector: linked node shows distribution summary + acti
         onPushToMC={vi.fn()}
       />
     );
-    // Range line: 14 · 26 · 44
-    expect(screen.getByText(/14/)).toBeInTheDocument();
-    expect(screen.getByText(/44/)).toBeInTheDocument();
+    // Range line must contain the full "14 · 26 · 44" string in one element
+    expect(screen.getByText(/14 · 26 · 44/)).toBeInTheDocument();
+  });
+
+  it("shows formatted param line for a normal distribution node", () => {
+    const normalNode: DependencyNode = {
+      id: "normal-node-id",
+      label: "Price risk",
+      role: "uncertainty",
+      mc: {
+        varName: "price_risk",
+        distribution: { kind: "normal", mean: 100, sd: 15 },
+        summary: { p10: 81, p50: 100, p90: 119, mean: 100, definedAt: "2026-06-11T00:00:00Z" },
+      },
+    };
+    render(
+      <NodeInspector
+        node={normalNode}
+        onUpdate={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+        onPushToMC={vi.fn()}
+      />
+    );
+    // Params for normal: mean 100 · sd 15 (formatted through formatRange)
+    expect(screen.getByText(/mean 100/i)).toBeInTheDocument();
+    expect(screen.getByText(/sd 15/i)).toBeInTheDocument();
   });
 
   it("shows 'Edit in § I' button for a linked uncertainty node", () => {
@@ -940,6 +964,64 @@ describe("T5-B3 – ReadoutPanel: Resolve-next rows with mc.summary append range
 
     // No summary → no range suffix
     expect(screen.queryByText(/14.{1,5}44/)).not.toBeInTheDocument();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// B5-store – Role change strips mc-link-store binding (fix: handleUpdateNode
+//            must call removeMcLink, same invariant as handleUnlinkMC)
+// ---------------------------------------------------------------------------
+describe("B5-store – role change clears mc-link-store binding", () => {
+  async function pushAndVerifyLinked(label: string, container: HTMLElement) {
+    const input = screen.getByPlaceholderText(/add a factor/i);
+    fireEvent.change(input, { target: { value: label } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => {
+      expect(container.querySelectorAll(".react-flow__node").length).toBeGreaterThanOrEqual(1);
+    });
+    fireEvent.click(screen.getByRole("button", { name: label }));
+    const uncRadio = await screen.findByRole("radio", { name: /uncertainty/i });
+    fireEvent.click(uncRadio);
+    const simulateBtn = await screen.findByRole("button", { name: /simulate in § i/i });
+    fireEvent.click(simulateBtn);
+    await waitFor(() => expect(mockNavigate).toHaveBeenCalledWith("/mc"));
+    // Binding must be registered
+    const links = getMcLinks();
+    expect(links.length).toBeGreaterThanOrEqual(1);
+    return links[links.length - 1];
+  }
+
+  it("changing role to lever removes binding from mc-link-store", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    await pushAndVerifyLinked("Store Test A", container);
+    expect(getMcLinks().some((l) => l.varName === "store_test_a")).toBe(true);
+
+    // Change role to lever
+    const leverRadio = screen.getByRole("radio", { name: /lever/i });
+    fireEvent.click(leverRadio);
+
+    // Store binding must be gone immediately (sync path)
+    expect(getMcLinks().some((l) => l.varName === "store_test_a")).toBe(false);
+  });
+
+  it("changing role to factor removes binding from mc-link-store", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    await pushAndVerifyLinked("Store Test B", container);
+    expect(getMcLinks().some((l) => l.varName === "store_test_b")).toBe(true);
+
+    // Change role to factor
+    const factorRadio = screen.getByRole("radio", { name: /factor/i });
+    fireEvent.click(factorRadio);
+
+    expect(getMcLinks().some((l) => l.varName === "store_test_b")).toBe(false);
   });
 });
 
