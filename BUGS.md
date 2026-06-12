@@ -4,7 +4,20 @@ Log new issues below with date, area (core / desktop / py-engine), repro, and cu
 
 ## Open
 
-_(none)_
+### 2026-06-12 — Playwright reports the kinetic h1 intercepting canvas right-clicks (§ IV)
+
+- **Area:** desktop / renderer (`components/ModuleFrame.tsx` h1 + `index.css` `.headline-kinetic`)
+- **Repro:** e2e `setRoleViaContextMenu` in `tests/e2e/depmap.spec.ts` — right-clicking
+  a canvas node times out with "h1 intercepts pointer events" unless `force: true`.
+- **Suspicion (unconfirmed):** `.headline-kinetic`'s `unspace` animation uses
+  `animation-fill-mode: both` — during the 800ms mount the h1 is hit-testable while
+  invisible, and afterwards the pinned `filter: blur(0)` keeps a stacking context on
+  it. Static layout reading says the h1 shouldn't overlap the canvas, so this may be
+  transient-during-animation or a misattributed `elementFromPoint` during scroll.
+  Possibly related to the user-reported "new node needs a second click to focus".
+- **Next step:** reproduce headed (`PWDEBUG=1`), capture the real intercepting
+  element. Cheap hardening either way: `pointer-events: none` on the non-interactive
+  h1 and/or drop `fill-mode: both` so the filter clears after the animation.
 
 ## Resolved
 

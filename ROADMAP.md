@@ -103,7 +103,7 @@ All 8 second-round usability feedback items addressed:
 
 **Final test counts:** 77 core · 189 desktop unit · 8 e2e (all green)
 
-### v1.6 § IV → § I Monte Carlo hand-off shipped (2026-06-12) — PR open, branch `feat/depmap-mc-handoff`
+### v1.6 § IV → § I Monte Carlo hand-off shipped (2026-06-12) — branch `feat/depmap-mc-handoff`
 
 **Design spec:** `docs/superpowers/specs/2026-06-11-depmap-mc-handoff-design.md`
 **Implementation plan:** `docs/superpowers/plans/2026-06-11-depmap-mc-handoff.md`

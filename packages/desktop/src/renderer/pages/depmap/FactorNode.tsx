@@ -28,7 +28,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Handle, Position } from "reactflow";
 import type { NodeProps } from "reactflow";
 import { roleGlyph } from "./roles";
-import { formatRange } from "../../lib/format-range";
 
 // ---------------------------------------------------------------------------
 // Types

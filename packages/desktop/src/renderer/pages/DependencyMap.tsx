@@ -159,6 +159,9 @@ export default function DependencyMap() {
 
   const handleDeleteNode = useCallback((id: string) => {
     freshNodeIds.current.delete(id);
+    // Deleting a linked node must also clear its § I binding (same invariant
+    // as unlink/role-change), or § I would resurrect it as a broken ad-hoc var.
+    removeMcLink(id);
     setMap((prev) => ({
       ...prev,
       nodes: prev.nodes.filter((n) => n.id !== id),

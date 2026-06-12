@@ -1023,6 +1023,21 @@ describe("B5-store – role change clears mc-link-store binding", () => {
 
     expect(getMcLinks().some((l) => l.varName === "store_test_b")).toBe(false);
   });
+
+  it("deleting a linked node removes its binding from mc-link-store", async () => {
+    const { container } = render(
+      <MemoryRouter>
+        <DependencyMap />
+      </MemoryRouter>
+    );
+    await pushAndVerifyLinked("Store Test C", container);
+    expect(getMcLinks().some((l) => l.varName === "store_test_c")).toBe(true);
+
+    // Delete via the inspector (node is already selected from the push flow)
+    fireEvent.click(screen.getByRole("button", { name: /delete factor/i }));
+
+    expect(getMcLinks().some((l) => l.varName === "store_test_c")).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
